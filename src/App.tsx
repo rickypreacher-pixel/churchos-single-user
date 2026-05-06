@@ -5910,6 +5910,8 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
   const [groupAssignOpen,setGroupAssignOpen] = useState(false);
   const [roleAssignOpen,setRoleAssignOpen] = useState(false);
   const [roleAssignVal,setRoleAssignVal] = useState("");
+  const [campusAssignOpen,setCampusAssignOpen] = useState(false);
+  const [campusAssignVal,setCampusAssignVal] = useState("");
   const sf2 = (k:string) => (v:any) => setFilters(f=>({...f,[k]:v}));
   const clearFilters = () => setFilters({...BLANK_FILTERS});
   const activeFiltersCount = Object.entries(filters).filter(([k,v])=>k==="birthdayThisMonth"?v:v!=="all").length;
@@ -6218,6 +6220,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
           <Btn v="gold" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportCSV(selectedPeople)}>📤 Export CSV</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setGroupAssignOpen(true)}>👥 Assign Group</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setRoleAssignVal("");setRoleAssignOpen(true);}}>🏷️ Set Role</Btn>
+          {campuses.length>1&&<Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setCampusAssignVal(campuses[0].id);setCampusAssignOpen(true);}}>🏛 Campus</Btn>}
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>printDirectory(selectedPeople)}>🖨️ Print</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{
             const lines = selectedPeople.map(p=>p.first+" "+p.last+(p.phone?" | "+p.phone:"")+(p.email?" | "+p.email:"")).join("\n");
@@ -6360,6 +6363,28 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
             setSelected(new Set());
           }}>Apply Role</Btn>
           <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setRoleAssignOpen(false)}>Cancel</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Assign Campus Modal ──────────────────────────────────── */}
+      <Modal open={campusAssignOpen} onClose={()=>setCampusAssignOpen(false)} title={"🏛 Assign Campus to "+selected.size+" Person(s)"} width={380}>
+        <Fld label="Campus">
+          <select value={campusAssignVal} onChange={e=>setCampusAssignVal(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>
+            {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Fld>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn style={{flex:1,justifyContent:"center"}} onClick={()=>{
+            if(!campusAssignVal){return;}
+            const ids = new Set(selectedPeople.map((p:any)=>p.id));
+            setMembers((ms:any[])=>ms.map(m=>ids.has(m.id)?{...m,campus:campusAssignVal}:m));
+            setVisitors((vs:any[])=>vs.map(v=>ids.has(v.id)?{...v,campus:campusAssignVal}:v));
+            setCampusAssignOpen(false);
+            const cName = campuses.find((c:any)=>c.id===campusAssignVal)?.name||campusAssignVal;
+            alert(selected.size+" person(s) assigned to "+cName+".");
+            setSelected(new Set());
+          }}>Assign Campus</Btn>
+          <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setCampusAssignOpen(false)}>Cancel</Btn>
         </div>
       </Modal>
 
@@ -7051,7 +7076,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
 }
 
 // ── ATTENDANCE ──
-function Attendance({attendance,setAttendance,setView}:any) {
+function Attendance({attendance,setAttendance,setView,activeCampusId='all',campuses=[]}:any) {
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   const [insight,setInsight] = useState("");
@@ -7060,7 +7085,7 @@ function Attendance({attendance,setAttendance,setView}:any) {
   const sf = k => v => setForm(f=>({...f,[k]:v}));
   const save = () => {
     if(!form.date||!form.count){alert("Date and count required.");return;}
-    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,id:nid.current++},...attendance]);
+    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...attendance]);
     setModal(false);
     setForm({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   };
@@ -7070,15 +7095,16 @@ function Attendance({attendance,setAttendance,setView}:any) {
     const txt = await callAI([{role:"user",content:"Analyze NTCC attendance for Pastor Hall in 2-3 sentences: "+data}],[],[],[],[],[],{});
     setInsight(txt); setLoad(false);
   };
-  const avg = attendance.length ? Math.round(attendance.reduce((a,s)=>a+s.count,0)/attendance.length) : 0;
-  const best = [...attendance].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
+  const filtAtt = activeCampusId&&activeCampusId!=='all' ? attendance.filter((a:any)=>(a.campus||'campus_main')===activeCampusId) : attendance;
+  const avg = filtAtt.length ? Math.round(filtAtt.reduce((a,s)=>a+s.count,0)/filtAtt.length) : 0;
+  const best = [...filtAtt].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:20}}>
-        <Stat label="Services" value={attendance.length}/>
+        <Stat label="Services" value={filtAtt.length}/>
         <Stat label="Avg Attendance" value={avg} color={BL}/>
         <Stat label="Best Service" value={best.count} sub={best.service} color={GR}/>
-        <Stat label="Total Visitors" value={attendance.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
+        <Stat label="Total Visitors" value={filtAtt.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
       </div>
       <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:16,marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -7102,7 +7128,7 @@ function Attendance({attendance,setAttendance,setView}:any) {
             </tr>
           </thead>
           <tbody>
-            {attendance.map(a=>(
+            {filtAtt.map(a=>(
               <tr key={a.id} style={{borderBottom:"0.5px solid "+BR}}>
                 <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{fd(a.date)}</td>
                 <td style={{padding:"10px 14px",fontSize:13}}>{a.service}</td>
@@ -8208,7 +8234,7 @@ function GivingHistory({giving,members,visitors}){
   );
 }
 
-function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[]}:any) {
+function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[],activeCampusId='all',campuses=[]}:any) {
   const [tab,setTab] = useState("giving");
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),name:"",category:"Tithe",amount:"",method:"Cash",notes:""});
@@ -8273,7 +8299,8 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
       setNameSugg(hits); setShowSugg(hits.length>0);
     } else { setShowSugg(false); }
   };
-  const thisMonth = giving.filter(g=>g.date.startsWith("2026-04"));
+  const filtGiving = activeCampusId&&activeCampusId!=='all' ? giving.filter((g:any)=>(g.campus||'campus_main')===activeCampusId) : giving;
+  const thisMonth = filtGiving.filter(g=>g.date.startsWith("2026-04"));
   const total = thisMonth.reduce((a,g)=>a+g.amount,0);
   const tithe = thisMonth.filter(g=>g.category==="Tithe").reduce((a,g)=>a+g.amount,0);
   const offering = thisMonth.filter(g=>g.category==="Offering").reduce((a,g)=>a+g.amount,0);
@@ -8288,7 +8315,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
     if(editingId) {
       setGiving(giving.map(r=>r.id===editingId ? {...r,category:form.category,amount:+form.amount,method:form.method,notes:form.notes} : r));
     } else {
-      setGiving([{...form,amount:+form.amount,id:nid.current++},...giving]);
+      setGiving([{...form,amount:+form.amount,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...giving]);
     }
     setModal(false);
     setEditingId(null);
@@ -8328,7 +8355,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
         <Stat label="April Total" value={f$(total)} color={GR}/>
         <Stat label="Tithes" value={f$(tithe)} sub="This month"/>
         <Stat label="Offerings" value={f$(offering)} sub="This month" color={G}/>
-        <Stat label="Records" value={giving.length} sub="All time"/>
+        <Stat label="Records" value={filtGiving.length} sub="All time"/>
       </div>
       {/* Pastor's Draw Card */}
       {(()=>{
@@ -8391,7 +8418,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
             </tr>
           </thead>
           <tbody>
-            {giving.map(g=>{
+            {filtGiving.map(g=>{
               const person = members.find(m=>(m.first+" "+m.last)===g.name) || visitors.find(v=>(v.first+" "+v.last)===g.name);
               const personEmail = person?.email || "";
               return (
@@ -12195,8 +12222,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           )}
           {!isMemberPortal && view==="prospects" && <ProspectsPage prospects={prospects} setProspects={setProspects} members={members}/>}
           {!isMemberPortal && view==="visitation" && <Visitation visitors={visitors} setVisitors={setVisitors} members={members} setMembers={setMembers} users={users} currentUser={currentUser} roles={roles} visitRecords={visitRecords} setVisitRecords={setVisitRecords} setView={setView} canAddVisitor={canAddVisitor}/>}
-          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView}/>}
-          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles}/>}
+          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView} activeCampusId={activeCampusId} campuses={campuses}/>}
+          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles} activeCampusId={activeCampusId} campuses={campuses}/>}
           {!isMemberPortal && view==="prayer" && <Prayer prayers={prayers} setPrayers={setPrayers}/>}
           {/* ── Member Portal hard-gate: only myprofile and prayer allowed ── */}
           {isMemberPortal && view!=="prayer" && <MemberProfilePortal member={portalMember} setMembers={setMembers} giving={giving} onSignOut={onSignOut} roles={roles} users={users} setUsers={setUsers}/>}
