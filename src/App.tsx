@@ -6768,6 +6768,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
                     </div>
                   )}
                   <Fld label="Family Name"><Inp value={editForm.family||""} onChange={ef("family")} placeholder="Lee Household"/></Fld>
+                  {campuses.length>1&&<Fld label="Campus"><select value={editForm.campus||'campus_main'} onChange={e=>ef("campus")(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>{campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>}
                 </SectionCard>
 
                 <SectionCard title="Address">
