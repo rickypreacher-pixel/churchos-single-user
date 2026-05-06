@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 
@@ -12117,11 +12117,11 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             {!isStaff && <button onClick={()=>{setView("ai");setNavOpen(false);}} style={{background:GL,border:"1px solid "+G,borderRadius:8,padding:isMobile?"7px 10px":"7px 12px",cursor:"pointer",fontSize:12,fontWeight:500,color:"#7a5c10",whiteSpace:"nowrap"}}>AI</button>}
 
             {/* � Campus Selector */}
-            {!isStaff && campuses.length>0 && !isMobile && (
+            {!isStaff && campuses.length>1 && (
               <select value={activeCampusId} onChange={e=>setActiveCampusId(e.target.value)}
-                title="Active Campus" style={{padding:"6px 10px",border:"0.5px solid "+BR,borderRadius:8,background:W,fontSize:12,fontWeight:500,color:N,cursor:"pointer",maxWidth:180,outline:"none"}}>
-                <option value="all">🏛 All Campuses</option>
-                {campuses.map((c:any)=><option key={c.id} value={c.id}>🏛 {c.name}</option>)}
+                title="Active Campus" style={{padding:"6px 10px",border:"0.5px solid "+BR,borderRadius:8,background:W,fontSize:12,fontWeight:500,color:N,cursor:"pointer",maxWidth:isMobile?140:180,outline:"none"}}>
+                <option value="all">🏛 All</option>
+                {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
 
