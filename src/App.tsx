@@ -11799,6 +11799,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       if(Array.isArray(d.users)&&d.users.length) setUsers(d.users);
       if(Array.isArray(d.prospects)) setProspects(d.prospects); // trust empty array — removal on another device must propagate
       if(d.churchSettings?.name){setChurchSettings(d.churchSettings);try{localStorage.setItem(LS('church_settings'),JSON.stringify(d.churchSettings));}catch(e){}}
+      if(Array.isArray(d.campuses)&&d.campuses.length) setCampuses(d.campuses);
       lastSyncAt.current = Date.now();
       // Suppress the next auto-save triggered by these state changes — we just loaded from cloud,
       // no need to immediately write back what we just read
@@ -11849,7 +11850,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const blob = {members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects};
+        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -11861,7 +11862,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   },[JSON.stringify({members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
     children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
     emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects})]);
+    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses})]);
 
   const nidEmail = useRef(8000);
   const logEmail = (data) => {
