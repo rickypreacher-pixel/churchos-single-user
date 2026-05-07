@@ -943,61 +943,6 @@ function SetupModal({onSave,initialName,initialPastorName}){
   </div>);
 }
 
-function CampusManager({campuses,setCampuses}:any){
-  const [newName,setNewName]=useState('');
-  const [editId,setEditId]=useState<any>(null);
-  const [editName,setEditName]=useState('');
-  const addCampus=()=>{
-    const nm=newName.trim();
-    if(!nm) return;
-    if(campuses.some((c:any)=>c.name.toLowerCase()===nm.toLowerCase())){alert('A campus with that name already exists.');return;}
-    const id='campus_'+Date.now();
-    setCampuses((cs:any[])=>[...cs,{id,name:nm}]);
-    setNewName('');
-  };
-  const saveName=(id:string)=>{
-    const nm=editName.trim();
-    if(!nm) return;
-    setCampuses((cs:any[])=>cs.map((c:any)=>c.id===id?{...c,name:nm}:c));
-    setEditId(null);setEditName('');
-  };
-  const deleteCampus=(id:string)=>{
-    if(campuses.length<=1){alert('You must have at least one campus.');return;}
-    if(!window.confirm('Delete this campus? Members assigned to it will remain in the database.')) return;
-    setCampuses((cs:any[])=>cs.filter((c:any)=>c.id!==id));
-  };
-  return(
-    <div style={{maxWidth:600}}>
-      <h3 style={{fontSize:15,fontWeight:500,color:N,marginBottom:4}}>Campus Management</h3>
-      <p style={{fontSize:13,color:MU,marginBottom:18}}>Each campus shares the same database. Staff assigned to a campus see only that campus's records. The main admin can switch between campuses or view all.</p>
-      <div style={{marginBottom:20}}>
-        {campuses.map((c:any)=>(
-          <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,background:W,border:'0.5px solid '+BR,borderRadius:10,padding:'10px 14px',marginBottom:8}}>
-            <span style={{fontSize:16}}>🏛</span>
-            {editId===c.id?(
-              <>
-                <input value={editName} onChange={e=>setEditName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveName(c.id);}} style={{flex:1,padding:'6px 10px',border:'0.5px solid '+N,borderRadius:7,fontSize:13,outline:'none'}} autoFocus/>
-                <button onClick={()=>saveName(c.id)} style={{padding:'5px 14px',background:N,color:'#fff',border:'none',borderRadius:7,fontSize:12,cursor:'pointer',fontWeight:500}}>Save</button>
-                <button onClick={()=>{setEditId(null);setEditName('');}} style={{padding:'5px 10px',background:'none',border:'0.5px solid '+BR,borderRadius:7,fontSize:12,cursor:'pointer',color:MU}}>Cancel</button>
-              </>
-            ):(
-              <>
-                <span style={{flex:1,fontSize:13,fontWeight:500,color:TX}}>{c.name}</span>
-                <button onClick={()=>{setEditId(c.id);setEditName(c.name);}} style={{padding:'4px 12px',background:'none',border:'0.5px solid '+BR,borderRadius:7,fontSize:12,cursor:'pointer',color:MU}}>Rename</button>
-                {campuses.length>1&&<button onClick={()=>deleteCampus(c.id)} style={{padding:'4px 10px',background:'none',border:'0.5px solid #fecaca',borderRadius:7,fontSize:12,cursor:'pointer',color:RE}}>Delete</button>}
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:10,alignItems:'center'}}>
-        <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCampus();}} placeholder="New campus name..." style={{flex:1,padding:'8px 12px',border:'0.5px solid '+BR,borderRadius:8,fontSize:13,outline:'none'}}/>
-        <button onClick={addCampus} style={{padding:'8px 18px',background:N,color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontWeight:500}}>+ Add Campus</button>
-      </div>
-    </div>
-  );
-}
-
 function BackupRestore({backupData,onRestore}:any){
   const [restoreFile,setRestoreFile]=useState<any>(null);
   const [restoreData,setRestoreData]=useState<any>(null);
@@ -1115,7 +1060,7 @@ function BackupRestore({backupData,onRestore}:any){
   );
 }
 
-function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVisitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,backupData,onRestore,campuses=[],setCampuses=()=>{}}:any){
+function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVisitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,backupData,onRestore}:any){
   const [form,setForm]=useState({...cs});
   const [saved,setSaved]=useState(false);
   const [stab,setStab]=useState('general');
@@ -1141,14 +1086,12 @@ function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVi
   return (<div>
     {/* Tab bar */}
     <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'1.5px solid '+BR,paddingBottom:0}}>
-      {[{id:'general',label:'⚙ General'},{id:'campuses',label:'🏛 Campuses'},{id:'merge',label:'🔀 Merge Tool'},{id:'breeze',label:'🌐 Breeze Import'},{id:'backup',label:'💾 Backup & Restore'}].map(t=>(
-        <button key={t.id} onClick={()=>setStab(t.id)} style={{padding:'8px 18px',fontSize:13,fontWeight:stab===t.id?600:400,color:stab===t.id?N:MU,background:'none',border:'none',borderBottom:stab===t.id?'2.5px solid '+N:'2.5px solid transparent',cursor:'pointer',marginBottom:-1.5}}>{t.label}</button>
+      {[{id:'general',label:'⚙ General'},{id:'merge',label:'🔀 Merge Tool'},{id:'breeze',label:'🌐 Breeze Import'},{id:'backup',label:'💾 Backup & Restore'}].map(t=>(        <button key={t.id} onClick={()=>setStab(t.id)} style={{padding:'8px 18px',fontSize:13,fontWeight:stab===t.id?600:400,color:stab===t.id?N:MU,background:'none',border:'none',borderBottom:stab===t.id?'2.5px solid '+N:'2.5px solid transparent',cursor:'pointer',marginBottom:-1.5}}>{t.label}</button>
       ))}
     </div>
     {stab==='merge'&&<MergeTool members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors}/>}
     {stab==='breeze'&&<BreezeMergeTool members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors}/>}
     {stab==='backup'&&<BackupRestore backupData={backupData} onRestore={onRestore}/>}
-    {stab==='campuses'&&<CampusManager campuses={campuses} setCampuses={setCampuses}/>}
     {stab==='general'&&<div>
     {saved&&<div style={{background:"#dcfce7",border:"0.5px solid #86efac",borderRadius:9,padding:"10px 16px",marginBottom:14,fontSize:13,color:"#14532d",fontWeight:500}}>Settings saved successfully.</div>}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
@@ -2066,9 +2009,7 @@ const SEED_ROLES=[
   {id:"role_checkin",name:"Check-in",description:"Kids and event check-in station",color:"#ea580c",isSystem:false},
   {id:"role_kitchen",name:"Kitchen",description:"Kitchen and hospitality ministry",color:"#854d0e",isSystem:false},
   {id:"role_nursery",name:"Nursery",description:"Nursery care team",color:"#4f46e5",isSystem:false},
-  {id:"role_campus_admin",name:"Campus Admin",description:"Manages a specific campus — sees only their campus data",color:"#0891b2",isSystem:false},
 ];
-const ICAMPUSES=[{id:"campus_main",name:"Central HQ Campus"}];
 const makeFullPerms=()=>{const p={};MODULES.forEach(m=>{p[m.key]={};m.actions.forEach(a=>p[m.key][a]=true);});return p;};
 const makeEmptyPerms=()=>{const p={};MODULES.forEach(m=>{p[m.key]={};m.actions.forEach(a=>p[m.key][a]=false);});return p;};
 const SEED_PERMS={
@@ -5885,7 +5826,7 @@ const MiniStat = ({label,value,color=N,sub}:any) => (
     {sub && <div style={{fontSize:10,color:MU,marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</div>}
   </div>
 );
-function People({members,setMembers,visitors,setVisitors,attendance,giving,setGiving,prayers,setPrayers,groups,setGroups,grpMeetings,setGrpMeetings,visitRecords,setVisitRecords,checkIns,setCheckIns,setView,canViewGiving,currentUser,roles=[],children=[],setChildren=null,campuses=[],activeCampusId='all'}:any) {
+function People({members,setMembers,visitors,setVisitors,attendance,giving,setGiving,prayers,setPrayers,groups,setGroups,grpMeetings,setGrpMeetings,visitRecords,setVisitRecords,checkIns,setCheckIns,setView,canViewGiving,currentUser,roles=[],children=[],setChildren=null}:any) {
   const [tab,setTab] = useState("members");
   const [search,setSearch] = useState("");
   const [showSug,setShowSug] = useState(false);
@@ -5910,8 +5851,6 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
   const [groupAssignOpen,setGroupAssignOpen] = useState(false);
   const [roleAssignOpen,setRoleAssignOpen] = useState(false);
   const [roleAssignVal,setRoleAssignVal] = useState("");
-  const [campusAssignOpen,setCampusAssignOpen] = useState(false);
-  const [campusAssignVal,setCampusAssignVal] = useState("");
   const sf2 = (k:string) => (v:any) => setFilters(f=>({...f,[k]:v}));
   const clearFilters = () => setFilters({...BLANK_FILTERS});
   const activeFiltersCount = Object.entries(filters).filter(([k,v])=>k==="birthdayThisMonth"?v:v!=="all").length;
@@ -5958,9 +5897,6 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
   };
 
   const applyFilters = (list:any[], q:string = "") => list.filter(p => {
-    if(activeCampusId && activeCampusId!=='all') {
-      if((p.campus||'campus_main')!==activeCampusId) return false;
-    }
     if(q.length>0) { if(!((p.first||"")+" "+(p.last||"")).toLowerCase().includes(q)) return false; }
     if(tab==="members") {
       if(filters.status!=="all" && p.status!==filters.status) return false;
@@ -6220,8 +6156,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
           <Btn v="gold" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportCSV(selectedPeople)}>📤 Export CSV</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setGroupAssignOpen(true)}>👥 Assign Group</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setRoleAssignVal("");setRoleAssignOpen(true);}}>🏷️ Set Role</Btn>
-          {campuses.length>1&&<Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setCampusAssignVal(campuses[0].id);setCampusAssignOpen(true);}}>🏛 Campus</Btn>}
-          <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>printDirectory(selectedPeople)}>🖨️ Print</Btn>
+          <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>printDirectory(selectedPeople)}>🖸️ Print</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{
             const lines = selectedPeople.map(p=>p.first+" "+p.last+(p.phone?" | "+p.phone:"")+(p.email?" | "+p.email:"")).join("\n");
             navigator.clipboard.writeText(lines).then(()=>alert("Copied "+selected.size+" contacts to clipboard."));
@@ -6363,28 +6298,6 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
             setSelected(new Set());
           }}>Apply Role</Btn>
           <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setRoleAssignOpen(false)}>Cancel</Btn>
-        </div>
-      </Modal>
-
-      {/* ── Assign Campus Modal ──────────────────────────────────── */}
-      <Modal open={campusAssignOpen} onClose={()=>setCampusAssignOpen(false)} title={"🏛 Assign Campus to "+selected.size+" Person(s)"} width={380}>
-        <Fld label="Campus">
-          <select value={campusAssignVal} onChange={e=>setCampusAssignVal(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>
-            {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </Fld>
-        <div style={{display:"flex",gap:8,marginTop:4}}>
-          <Btn style={{flex:1,justifyContent:"center"}} onClick={()=>{
-            if(!campusAssignVal){return;}
-            const ids = new Set(selectedPeople.map((p:any)=>p.id));
-            setMembers((ms:any[])=>ms.map(m=>ids.has(m.id)?{...m,campus:campusAssignVal}:m));
-            setVisitors((vs:any[])=>vs.map(v=>ids.has(v.id)?{...v,campus:campusAssignVal}:v));
-            setCampusAssignOpen(false);
-            const cName = campuses.find((c:any)=>c.id===campusAssignVal)?.name||campusAssignVal;
-            alert(selected.size+" person(s) assigned to "+cName+".");
-            setSelected(new Set());
-          }}>Assign Campus</Btn>
-          <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setCampusAssignOpen(false)}>Cancel</Btn>
         </div>
       </Modal>
 
@@ -6793,7 +6706,6 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
                     </div>
                   )}
                   <Fld label="Family Name"><Inp value={editForm.family||""} onChange={ef("family")} placeholder="Lee Household"/></Fld>
-                  {campuses.length>1&&<Fld label="Campus"><select value={editForm.campus||'campus_main'} onChange={e=>ef("campus")(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>{campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>}
                 </SectionCard>
 
                 <SectionCard title="Address">
@@ -7076,7 +6988,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
 }
 
 // ── ATTENDANCE ──
-function Attendance({attendance,setAttendance,setView,activeCampusId='all',campuses=[]}:any) {
+function Attendance({attendance,setAttendance,setView}:any) {
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   const [insight,setInsight] = useState("");
@@ -7085,7 +6997,7 @@ function Attendance({attendance,setAttendance,setView,activeCampusId='all',campu
   const sf = k => v => setForm(f=>({...f,[k]:v}));
   const save = () => {
     if(!form.date||!form.count){alert("Date and count required.");return;}
-    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...attendance]);
+    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,id:nid.current++},...attendance]);
     setModal(false);
     setForm({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   };
@@ -7095,16 +7007,15 @@ function Attendance({attendance,setAttendance,setView,activeCampusId='all',campu
     const txt = await callAI([{role:"user",content:"Analyze NTCC attendance for Pastor Hall in 2-3 sentences: "+data}],[],[],[],[],[],{});
     setInsight(txt); setLoad(false);
   };
-  const filtAtt = activeCampusId&&activeCampusId!=='all' ? attendance.filter((a:any)=>(a.campus||'campus_main')===activeCampusId) : attendance;
-  const avg = filtAtt.length ? Math.round(filtAtt.reduce((a,s)=>a+s.count,0)/filtAtt.length) : 0;
-  const best = [...filtAtt].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
+  const avg = attendance.length ? Math.round(attendance.reduce((a,s)=>a+s.count,0)/attendance.length) : 0;
+  const best = [...attendance].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:20}}>
-        <Stat label="Services" value={filtAtt.length}/>
+        <Stat label="Services" value={attendance.length}/>
         <Stat label="Avg Attendance" value={avg} color={BL}/>
         <Stat label="Best Service" value={best.count} sub={best.service} color={GR}/>
-        <Stat label="Total Visitors" value={filtAtt.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
+        <Stat label="Total Visitors" value={attendance.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
       </div>
       <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:16,marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -7128,7 +7039,7 @@ function Attendance({attendance,setAttendance,setView,activeCampusId='all',campu
             </tr>
           </thead>
           <tbody>
-            {filtAtt.map(a=>(
+            {attendance.map(a=>(
               <tr key={a.id} style={{borderBottom:"0.5px solid "+BR}}>
                 <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{fd(a.date)}</td>
                 <td style={{padding:"10px 14px",fontSize:13}}>{a.service}</td>
@@ -8234,7 +8145,7 @@ function GivingHistory({giving,members,visitors}){
   );
 }
 
-function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[],activeCampusId='all',campuses=[]}:any) {
+function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[]}:any) {
   const [tab,setTab] = useState("giving");
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),name:"",category:"Tithe",amount:"",method:"Cash",notes:""});
@@ -8299,8 +8210,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
       setNameSugg(hits); setShowSugg(hits.length>0);
     } else { setShowSugg(false); }
   };
-  const filtGiving = activeCampusId&&activeCampusId!=='all' ? giving.filter((g:any)=>(g.campus||'campus_main')===activeCampusId) : giving;
-  const thisMonth = filtGiving.filter(g=>g.date.startsWith("2026-04"));
+  const thisMonth = giving.filter(g=>g.date.startsWith("2026-04"));
   const total = thisMonth.reduce((a,g)=>a+g.amount,0);
   const tithe = thisMonth.filter(g=>g.category==="Tithe").reduce((a,g)=>a+g.amount,0);
   const offering = thisMonth.filter(g=>g.category==="Offering").reduce((a,g)=>a+g.amount,0);
@@ -8315,7 +8225,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
     if(editingId) {
       setGiving(giving.map(r=>r.id===editingId ? {...r,category:form.category,amount:+form.amount,method:form.method,notes:form.notes} : r));
     } else {
-      setGiving([{...form,amount:+form.amount,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...giving]);
+      setGiving([{...form,amount:+form.amount,id:nid.current++},...giving]);
     }
     setModal(false);
     setEditingId(null);
@@ -8355,7 +8265,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
         <Stat label="April Total" value={f$(total)} color={GR}/>
         <Stat label="Tithes" value={f$(tithe)} sub="This month"/>
         <Stat label="Offerings" value={f$(offering)} sub="This month" color={G}/>
-        <Stat label="Records" value={filtGiving.length} sub="All time"/>
+        <Stat label="Records" value={giving.length} sub="All time"/>
       </div>
       {/* Pastor's Draw Card */}
       {(()=>{
@@ -8418,7 +8328,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
             </tr>
           </thead>
           <tbody>
-            {filtGiving.map(g=>{
+            {giving.map(g=>{
               const person = members.find(m=>(m.first+" "+m.last)===g.name) || visitors.find(v=>(v.first+" "+v.last)===g.name);
               const personEmail = person?.email || "";
               return (
@@ -10075,7 +9985,7 @@ function Education({members,setMembers,visitors,users,roles,children,setChildren
 const ALLERGY_OPTIONS=["Peanuts","Tree Nuts","Milk/Dairy","Eggs","Wheat/Gluten","Soy","Fish","Shellfish","Latex","Bee Stings","Penicillin","Aspirin","Ibuprofen","Sulfa Drugs"];
 const MEDICAL_OPTIONS=["Diabetes","High Blood Pressure","Heart Condition","Asthma","Epilepsy/Seizures","Mobility Impairment","Vision Impairment","Hearing Impairment","Cancer","Kidney Disease","Thyroid Disorder","Depression/Anxiety","PTSD","Autism Spectrum"];
 
-function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,roles,permissions,setView,prospects,setProspects,children=[],setChildren=null,campuses=[]}:any){
+function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,roles,permissions,setView,prospects,setProspects,children=[],setChildren=null}:any){
   const canAdd = checkPermission(currentUser,roles,permissions,"directory","create");
   const addedByName = (()=>{
     if(!currentUser) return "Unknown";
@@ -10100,8 +10010,6 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
     status:"Active",role:"",joined:td(),family:"",
     // Visitor fields
     stage:"First Visit",sponsor:"",firstVisit:td(),
-    // Campus
-    campus:campuses.length>0?campuses[0].id:"campus_main",
     // Address
     address:{street:"",city:"",state:"AZ",zip:""},
     // Personal
@@ -10337,14 +10245,6 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
           </div>
         </Fld>
         <Fld label="Family / Household"><Inp value={form.family} onChange={sf("family")} placeholder="e.g. Smith Household"/></Fld>
-        {campuses.length>1&&(
-          <Fld label="Campus">
-            <select value={form.campus} onChange={e=>sf("campus")(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,background:W,color:TX,outline:"none"}}>
-              {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Fld>
-        )}
-
         {/* ── SECTION 2: Member or Visitor Status ── */}
         {pType==="member"?(
           <>
@@ -11736,10 +11636,6 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   useEffect(()=>{lsSave('attendance',attendance);},[JSON.stringify(attendance)]);
   useEffect(()=>{lsSave('giving',giving);},[JSON.stringify(giving)]);
   useEffect(()=>{lsSave('prayers',prayers);},[JSON.stringify(prayers)]);
-  const [campuses,setCampuses] = useState(()=>lsGet('campuses')??ICAMPUSES);
-  const [activeCampusId,setActiveCampusId] = useState(()=>lsGet('activeCampusId')??'all');
-  useEffect(()=>{lsSave('campuses',campuses);},[JSON.stringify(campuses)]);
-  useEffect(()=>{lsSave('activeCampusId',activeCampusId);},[activeCampusId]);
   useEffect(()=>{lsSave('groups',groups);},[JSON.stringify(groups)]);
   useEffect(()=>{lsSave('grpMeetings',grpMeetings);},[JSON.stringify(grpMeetings)]);
   useEffect(()=>{lsSave('visitRecords',visitRecords);},[JSON.stringify(visitRecords)]);
@@ -11827,7 +11723,6 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       if(Array.isArray(d.users)&&d.users.length) setUsers(d.users);
       if(Array.isArray(d.prospects)) setProspects(d.prospects); // trust empty array — removal on another device must propagate
       if(d.churchSettings?.name){setChurchSettings(d.churchSettings);try{localStorage.setItem(LS('church_settings'),JSON.stringify(d.churchSettings));}catch(e){}}
-      if(Array.isArray(d.campuses)&&d.campuses.length) setCampuses(d.campuses);
       lastSyncAt.current = Date.now();
       // Suppress the next auto-save triggered by these state changes — we just loaded from cloud,
       // no need to immediately write back what we just read
@@ -11878,7 +11773,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const blob = {members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses};
+        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -11890,7 +11785,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   },[JSON.stringify({members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
     children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
     emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses})]);
+    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects})]);
 
   const nidEmail = useRef(8000);
   const logEmail = (data) => {
@@ -12143,15 +12038,6 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             {cloudSync==='error' && <div style={{fontSize:11,color:RE,display:"flex",alignItems:"center",gap:4}}>⚠ Sync error</div>}
             {!isStaff && <button onClick={()=>{setView("ai");setNavOpen(false);}} style={{background:GL,border:"1px solid "+G,borderRadius:8,padding:isMobile?"7px 10px":"7px 12px",cursor:"pointer",fontSize:12,fontWeight:500,color:"#7a5c10",whiteSpace:"nowrap"}}>AI</button>}
 
-            {/* � Campus Selector */}
-            {!isStaff && campuses.length>1 && (
-              <select value={activeCampusId} onChange={e=>setActiveCampusId(e.target.value)}
-                title="Active Campus" style={{padding:"6px 10px",border:"0.5px solid "+BR,borderRadius:8,background:W,fontSize:12,fontWeight:500,color:N,cursor:"pointer",maxWidth:isMobile?140:180,outline:"none"}}>
-                <option value="all">🏛 All</option>
-                {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            )}
-
             {/* �🎨 Theme Picker */}
             <div style={{position:"relative"}}>
               <button onClick={()=>setShowThemePicker(p=>!p)} title="Change Theme" style={{background:W,border:"0.5px solid "+BR,borderRadius:8,padding:isMobile?"7px 10px":"7px 12px",cursor:"pointer",fontSize:14,lineHeight:1,flexShrink:0}}>🎨</button>
@@ -12185,7 +12071,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         {/* Page content */}
         <div style={{flex:1,padding:isMobile?12:24,overflow:"auto"}}>
           {showSetup && <SetupModal onSave={s=>{setChurchSettings(s);setShowSetup(false);}} initialName={churchName||''} initialPastorName={(adminFirst||adminLast)?`Pastor ${[adminFirst,adminLast].filter(Boolean).join(' ')}`:''}/>}
-          {!isMemberPortal && view==="settings" && <ChurchSettingsPage cs={churchSettings} setCs={setChurchSettings} churchId={churchId} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} prayers={prayers} groups={groups} grpMeetings={grpMeetings} visitRecords={visitRecords} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} pledgeDrives={pledgeDrives} pledges={pledges} weeklyReports={weeklyReports} equipment={equipment} workOrders={workOrders} schedMaint={schedMaint} campuses={campuses} setCampuses={setCampuses}
+          {!isMemberPortal && view==="settings" && <ChurchSettingsPage cs={churchSettings} setCs={setChurchSettings} churchId={churchId} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} prayers={prayers} groups={groups} grpMeetings={grpMeetings} visitRecords={visitRecords} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} pledgeDrives={pledgeDrives} pledges={pledges} weeklyReports={weeklyReports} equipment={equipment} workOrders={workOrders} schedMaint={schedMaint}
             backupData={{members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,users,roles,permissions,recurring,custom,emailLog,emailTemplates,emailConfig,incidents,rollCalls,progressNotes,teacherSchedule,churchSettings}}
             onRestore={(d:any,mode:string)=>{
               const s=(setter:any,key:string,isArr=true)=>{if(d[key]===undefined)return;if(mode==='replace'){setter(d[key]);}else{if(isArr&&Array.isArray(d[key])){setter((cur:any[])=>[...cur,...d[key].filter((n:any)=>!cur.find(x=>String(x.id)===String(n.id)))]);}else{setter(d[key]);}}};
@@ -12193,8 +12079,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             }}
           />}
           {!isMemberPortal && view==="dashboard" && <Dashboard members={members} visitors={visitors} attendance={attendance} giving={giving} prayers={prayers} setView={setView} canViewGiving={canViewGiving} isRestrictedUser={isRestrictedUser} canAddPerson={canAddPerson}/>}
-          {!isMemberPortal && view==="addperson" && <AddMemberPage members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} currentUser={currentUser} roles={roles} permissions={permissions} setView={setView} prospects={prospects} setProspects={setProspects} children={children} setChildren={setChildren} campuses={campuses}/>}
-          {!isMemberPortal && view==="people" && <People members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} setGiving={setGiving} prayers={prayers} setPrayers={setPrayers} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} visitRecords={visitRecords} setVisitRecords={setVisitRecords} checkIns={checkIns} setCheckIns={setCheckIns} setView={setView} canViewGiving={canViewGiving} currentUser={currentUser} roles={roles} children={children} setChildren={setChildren} campuses={campuses} activeCampusId={activeCampusId}/>}
+          {!isMemberPortal && view==="addperson" && <AddMemberPage members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} currentUser={currentUser} roles={roles} permissions={permissions} setView={setView} prospects={prospects} setProspects={setProspects} children={children} setChildren={setChildren}/>}
+          {!isMemberPortal && view==="people" && <People members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} setGiving={setGiving} prayers={prayers} setPrayers={setPrayers} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} visitRecords={visitRecords} setVisitRecords={setVisitRecords} checkIns={checkIns} setCheckIns={setCheckIns} setView={setView} canViewGiving={canViewGiving} currentUser={currentUser} roles={roles} children={children} setChildren={setChildren}/>}
           {!isMemberPortal && view==="groups" && <Groups members={members} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} currentUser={currentUser} roles={roles}/>}
           {!isMemberPortal && view==="education" && <Education members={members} setMembers={setMembers} visitors={visitors} users={users} roles={roles} children={children} setChildren={setChildren} classrooms={classrooms} setClassrooms={setClassrooms} teacherSchedule={teacherSchedule} setTeacherSchedule={setTeacherSchedule} kidsCheckIns={kidsCheckIns} setKidsCheckIns={setKidsCheckIns} checkIns={checkIns} incidents={incidents} setIncidents={setIncidents} rollCalls={rollCalls} setRollCalls={setRollCalls} progressNotes={progressNotes} setProgressNotes={setProgressNotes} cs={churchSettings} printerConfig={printerConfig} setPrinterConfig={setPrinterConfig}/>}
           {!isMemberPortal && view==="maintenance" && <Maintenance users={users} members={members} currentUser={currentUser} roles={roles} permissions={permissions} equipment={equipment} setEquipment={setEquipment} workOrders={workOrders} setWorkOrders={setWorkOrders} schedMaint={schedMaint} setSchedMaint={setSchedMaint} supplies={supplies} setSupplies={setSupplies} checkoutItems={checkoutItems} setCheckoutItems={setCheckoutItems} checkouts={checkouts} setCheckouts={setCheckouts}/>}
@@ -12222,8 +12108,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           )}
           {!isMemberPortal && view==="prospects" && <ProspectsPage prospects={prospects} setProspects={setProspects} members={members}/>}
           {!isMemberPortal && view==="visitation" && <Visitation visitors={visitors} setVisitors={setVisitors} members={members} setMembers={setMembers} users={users} currentUser={currentUser} roles={roles} visitRecords={visitRecords} setVisitRecords={setVisitRecords} setView={setView} canAddVisitor={canAddVisitor}/>}
-          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView} activeCampusId={activeCampusId} campuses={campuses}/>}
-          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles} activeCampusId={activeCampusId} campuses={campuses}/>}
+          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView}/>}
+          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles}/>}
           {!isMemberPortal && view==="prayer" && <Prayer prayers={prayers} setPrayers={setPrayers}/>}
           {/* ── Member Portal hard-gate: only myprofile and prayer allowed ── */}
           {isMemberPortal && view!=="prayer" && <MemberProfilePortal member={portalMember} setMembers={setMembers} giving={giving} onSignOut={onSignOut} roles={roles} users={users} setUsers={setUsers}/>}
