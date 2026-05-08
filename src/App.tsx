@@ -943,6 +943,61 @@ function SetupModal({onSave,initialName,initialPastorName}){
   </div>);
 }
 
+function CampusManager({campuses,setCampuses}:any){
+  const [newName,setNewName]=useState('');
+  const [editId,setEditId]=useState<any>(null);
+  const [editName,setEditName]=useState('');
+  const addCampus=()=>{
+    const nm=newName.trim();
+    if(!nm) return;
+    if(campuses.some((c:any)=>c.name.toLowerCase()===nm.toLowerCase())){alert('A campus with that name already exists.');return;}
+    const id='campus_'+Date.now();
+    setCampuses((cs:any[])=>[...cs,{id,name:nm}]);
+    setNewName('');
+  };
+  const saveName=(id:string)=>{
+    const nm=editName.trim();
+    if(!nm) return;
+    setCampuses((cs:any[])=>cs.map((c:any)=>c.id===id?{...c,name:nm}:c));
+    setEditId(null);setEditName('');
+  };
+  const deleteCampus=(id:string)=>{
+    if(campuses.length<=1){alert('You must have at least one campus.');return;}
+    if(!window.confirm('Delete this campus? Members assigned to it will remain in the database.')) return;
+    setCampuses((cs:any[])=>cs.filter((c:any)=>c.id!==id));
+  };
+  return(
+    <div style={{maxWidth:600}}>
+      <h3 style={{fontSize:15,fontWeight:500,color:N,marginBottom:4}}>Campus Management</h3>
+      <p style={{fontSize:13,color:MU,marginBottom:18}}>Each campus shares the same database. Staff assigned to a campus see only that campus's records. The main admin can switch between campuses or view all.</p>
+      <div style={{marginBottom:20}}>
+        {campuses.map((c:any)=>(
+          <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,background:W,border:'0.5px solid '+BR,borderRadius:10,padding:'10px 14px',marginBottom:8}}>
+            <span style={{fontSize:16}}>🏛</span>
+            {editId===c.id?(
+              <>
+                <input value={editName} onChange={e=>setEditName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')saveName(c.id);}} style={{flex:1,padding:'6px 10px',border:'0.5px solid '+N,borderRadius:7,fontSize:13,outline:'none'}} autoFocus/>
+                <button onClick={()=>saveName(c.id)} style={{padding:'5px 14px',background:N,color:'#fff',border:'none',borderRadius:7,fontSize:12,cursor:'pointer',fontWeight:500}}>Save</button>
+                <button onClick={()=>{setEditId(null);setEditName('');}} style={{padding:'5px 10px',background:'none',border:'0.5px solid '+BR,borderRadius:7,fontSize:12,cursor:'pointer',color:MU}}>Cancel</button>
+              </>
+            ):(
+              <>
+                <span style={{flex:1,fontSize:13,fontWeight:500,color:TX}}>{c.name}</span>
+                <button onClick={()=>{setEditId(c.id);setEditName(c.name);}} style={{padding:'4px 12px',background:'none',border:'0.5px solid '+BR,borderRadius:7,fontSize:12,cursor:'pointer',color:MU}}>Rename</button>
+                {campuses.length>1&&<button onClick={()=>deleteCampus(c.id)} style={{padding:'4px 10px',background:'none',border:'0.5px solid #fecaca',borderRadius:7,fontSize:12,cursor:'pointer',color:RE}}>Delete</button>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+        <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addCampus();}} placeholder="New campus name..." style={{flex:1,padding:'8px 12px',border:'0.5px solid '+BR,borderRadius:8,fontSize:13,outline:'none'}}/>
+        <button onClick={addCampus} style={{padding:'8px 18px',background:N,color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontWeight:500}}>+ Add Campus</button>
+      </div>
+    </div>
+  );
+}
+
 function BackupRestore({backupData,onRestore}:any){
   const [restoreFile,setRestoreFile]=useState<any>(null);
   const [restoreData,setRestoreData]=useState<any>(null);
@@ -1060,7 +1115,7 @@ function BackupRestore({backupData,onRestore}:any){
   );
 }
 
-function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVisitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,backupData,onRestore}:any){
+function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVisitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,backupData,onRestore,campuses=[],setCampuses=()=>{}}:any){
   const [form,setForm]=useState({...cs});
   const [saved,setSaved]=useState(false);
   const [stab,setStab]=useState('general');
@@ -1086,12 +1141,14 @@ function ChurchSettingsPage({cs,setCs,churchId,members,setMembers,visitors,setVi
   return (<div>
     {/* Tab bar */}
     <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'1.5px solid '+BR,paddingBottom:0}}>
-      {[{id:'general',label:'⚙ General'},{id:'merge',label:'🔀 Merge Tool'},{id:'breeze',label:'🌐 Breeze Import'},{id:'backup',label:'💾 Backup & Restore'}].map(t=>(        <button key={t.id} onClick={()=>setStab(t.id)} style={{padding:'8px 18px',fontSize:13,fontWeight:stab===t.id?600:400,color:stab===t.id?N:MU,background:'none',border:'none',borderBottom:stab===t.id?'2.5px solid '+N:'2.5px solid transparent',cursor:'pointer',marginBottom:-1.5}}>{t.label}</button>
+      {[{id:'general',label:'⚙ General'},{id:'campuses',label:'🏛 Campuses'},{id:'merge',label:'🔀 Merge Tool'},{id:'breeze',label:'🌐 Breeze Import'},{id:'backup',label:'💾 Backup & Restore'}].map(t=>(
+        <button key={t.id} onClick={()=>setStab(t.id)} style={{padding:'8px 18px',fontSize:13,fontWeight:stab===t.id?600:400,color:stab===t.id?N:MU,background:'none',border:'none',borderBottom:stab===t.id?'2.5px solid '+N:'2.5px solid transparent',cursor:'pointer',marginBottom:-1.5}}>{t.label}</button>
       ))}
     </div>
     {stab==='merge'&&<MergeTool members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors}/>}
     {stab==='breeze'&&<BreezeMergeTool members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors}/>}
     {stab==='backup'&&<BackupRestore backupData={backupData} onRestore={onRestore}/>}
+    {stab==='campuses'&&<CampusManager campuses={campuses} setCampuses={setCampuses}/>}
     {stab==='general'&&<div>
     {saved&&<div style={{background:"#dcfce7",border:"0.5px solid #86efac",borderRadius:9,padding:"10px 16px",marginBottom:14,fontSize:13,color:"#14532d",fontWeight:500}}>Settings saved successfully.</div>}
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
@@ -1746,7 +1803,6 @@ const MODULES=[
   {key:"reports",label:"Reports",icon:"Rpt",desc:"All reports and analytics",actions:["view","create","edit","delete"]},
   {key:"media",label:"Media Library",icon:"Med",desc:"Sermons and files",actions:["view","create","edit","delete"]},
   {key:"settings",label:"System Settings",icon:"Set",desc:"Users, roles, and config",actions:["view","create","edit","delete"]},
-  {key:"ai",label:"AI Assistant",icon:"AI",desc:"AI chat and automation — View: open page, Create: send messages, Edit: execute data actions, Delete: manage API keys",actions:["view","create","edit","delete"]},
 ];
 const PORTAL_PERMS=[
   {key:"viewAttendance",label:"View own attendance"},
@@ -1757,8 +1813,8 @@ const PORTAL_PERMS=[
 ];
 const ROLE_COLORS=["#1a2e5a","#c9a84c","#16a34a","#2563eb","#7c3aed","#dc2626","#d97706","#0891b2","#be185d","#065f46"];
 const blankPerms=()=>Object.fromEntries(MODULES.map(m=>[m.key,Object.fromEntries(m.actions.map(a=>[a,false]))]));
-const VS={Pastor:"Pastor Visit",TeamSupervisor:"Team Supervisor",TeamLeader:"Team Leader",Sponsor:"Sponsor",OngoingCare:"Ongoing Care",Complete:"Complete"};
-const VC={Pastor:N,TeamSupervisor:"#f97316",TeamLeader:PU,Sponsor:GR,OngoingCare:G,Complete:TE};
+const VS={Pastor:"Pastor Visit",TeamLeader:"Team Leader",Sponsor:"Sponsor",OngoingCare:"Ongoing Care",Complete:"Complete"};
+const VC={Pastor:N,TeamLeader:PU,Sponsor:GR,OngoingCare:G,Complete:TE};
 const METH_IC={Text:"💬",Call:"📞",Visit:"🚪"};
 const METH_CLR={Text:{bg:"#f3e8ff",c:PU},Call:{bg:"#eff6ff",c:BL},Visit:{bg:"#dcfce7",c:GR}};
 const AVC=["#1a2e5a","#c9a84c","#2e7d32","#1565c0","#6a1b9a","#00695c","#c62828","#e65100"];
@@ -1853,41 +1909,32 @@ async function speakEL(text, voiceId, apiKey?) {
 }
 
 // ── AI ──
-function buildSys(members, visitors, attend, giving, prayers, mem, users=[], visitRecords=[]) {
+function buildSys(members, visitors, attend, giving, prayers, mem) {
   const aprilGiving = giving.filter(g=>g.date.startsWith("2026-04")).reduce((a,g)=>a+g.amount,0);
   const recentAttend = attend.slice(0,12).map(a=>({date:a.date,service:a.service,count:a.count}));
   const recentGiving = giving.slice(0,20).map(g=>({date:g.date,name:g.name,category:g.category,amount:g.amount,method:g.method}));
   const recentPrayers = prayers.slice(0,15).map(p=>({name:p.name||"",request:p.request||"",status:p.status||""}));
-  const teamLeaders = members.filter(m=>m.role==="Team Leader").map(m=>{const u=users.find((u:any)=>u.memberId===m.id);return u?{userId:u.id,name:m.first+" "+m.last,gender:m.gender||"Unknown"}:null;}).filter(Boolean);
-  const teamSupervisors = members.filter(m=>m.role==="Team Supervisor").map(m=>{const u=users.find((u:any)=>u.memberId===m.id);return u?{userId:u.id,name:m.first+" "+m.last}:null;}).filter(Boolean);
-  const sponsors = members.filter(m=>m.role==="Sponsor").map(m=>{const u=users.find((u:any)=>u.memberId===m.id);return u?{userId:u.id,name:m.first+" "+m.last,gender:m.gender||"Unknown"}:null;}).filter(Boolean);
-  const activePipeline = (visitRecords as any[]).filter(r=>r.stage!=="Complete").map(r=>{const v=visitors.find((x:any)=>x.id===r.visitorId);const tsu=r.teamSupervisorUserId?(users as any[]).find((u:any)=>u.id===r.teamSupervisorUserId):null;const tsm=tsu?members.find((m:any)=>m.id===tsu.memberId):null;const tlu=r.teamLeaderUserId?(users as any[]).find((u:any)=>u.id===r.teamLeaderUserId):null;const tlm=tlu?members.find((m:any)=>m.id===tlu.memberId):null;const spu=r.sponsorUserId?(users as any[]).find((u:any)=>u.id===r.sponsorUserId):null;const spm=spu?members.find((m:any)=>m.id===spu.memberId):null;return{visitRecordId:r.id,visitorId:r.visitorId,visitorName:v?v.first+" "+v.last:"Unknown",visitorGender:v?.gender||"Unknown",stage:r.stage,teamSupervisor:tsm?{userId:tsu.id,name:tsm.first+" "+tsm.last}:null,teamLeader:tlm?{userId:tlu.id,name:tlm.first+" "+tlm.last}:null,sponsor:spm?{userId:spu.id,name:spm.first+" "+spm.last}:null};});;
   return "You are "+(window.__CS__?.name||"NTCC")+" AI — an intelligence at IQ 250, combining Elon Musk's first-principles brilliance, Nikola Tesla's inventive genius, and a warm Southern American pastor's heart. You serve "+(window.__CS__?.pastorName||"Pastor Hall")+" of "+(window.__CS__?.name||"New Testament Christian Church")+", "+(window.__CS__?.address||"Glendale AZ")+". Call them "+(window.__CS__?.pastorName||"Pastor Hall")+" or Sir. Speak warmly and naturally.\n\n" +
     "LIVE DATABASE:\n" +
     "Members(" + members.length + "): " + JSON.stringify(members.slice(0,60).map(m=>({id:m.id,name:m.first+" "+m.last,status:m.status,role:m.role,phone:m.phone,email:m.email}))) + "\n" +
-    "Visitors(" + visitors.length + "): " + JSON.stringify(visitors.slice(0,30).map(v=>({id:v.id,name:v.first+" "+v.last,stage:v.stage,phone:v.phone,firstVisit:v.firstVisit,gender:v.gender||"Unknown"}))) + "\n" +
+    "Visitors(" + visitors.length + "): " + JSON.stringify(visitors.slice(0,30).map(v=>({id:v.id,name:v.first+" "+v.last,stage:v.stage,phone:v.phone,firstVisit:v.firstVisit}))) + "\n" +
     "Attendance(" + attend.length + " records, recent 12): " + JSON.stringify(recentAttend) + "\n" +
     "April Giving: $" + aprilGiving + " | Recent Giving: " + JSON.stringify(recentGiving) + "\n" +
     "Prayer Requests (recent 15): " + JSON.stringify(recentPrayers) + "\n\n" +
-    "VISITATION PIPELINE (active visits): " + JSON.stringify(activePipeline) + "\n" +
-    "Team Supervisors (members with role=Team Supervisor who have system access): " + JSON.stringify(teamSupervisors) + "\n" +
-    "Team Leaders (members with role=Team Leader who have system access): " + JSON.stringify(teamLeaders) + "\n" +
-    "Sponsors (members with role=Sponsor who have system access): " + JSON.stringify(sponsors) + "\n\n" +
     "MEMORY: " + (mem.preferences||"Learning...") + " | Commands: " + (mem.commands||"Building...") + "\n\n" +
     "COMMAND EXECUTION: When Pastor Hall gives an executable command, respond naturally first, then on its own line append:\n" +
     "[ACTION:{\"type\":\"TYPE\",\"data\":{},\"confirm\":\"Plain English confirmation\"}]\n\n" +
-    "Types: ADD_MEMBER(first,last,phone,email,role,status,joined) | ADD_VISITOR(first,last,phone,email,stage,firstVisit,notes) | LOG_ATTENDANCE(date,service,count,members,visitors,notes) | RECORD_GIVING(name,date,category,amount,method,notes) | UPDATE_MEMBER(id,status,role) | DELETE_MEMBER(id) | DELETE_VISITOR(id) | NAVIGATE(section) | ASSIGN_TS(visitRecordId,userId) | ASSIGN_TL(visitRecordId,userId) | ASSIGN_SPONSOR(visitRecordId,userId)\n\n" +
+    "Types: ADD_MEMBER(first,last,phone,email,role,status,joined) | ADD_VISITOR(first,last,phone,email,stage,firstVisit,notes) | LOG_ATTENDANCE(date,service,count,members,visitors,notes) | RECORD_GIVING(name,date,category,amount,method,notes) | UPDATE_MEMBER(id,status,role) | DELETE_MEMBER(id) | DELETE_VISITOR(id) | NAVIGATE(section)\n\n" +
     "Sections: people, visitation, attendance, giving, prayer, access\n\n" +
-    "ASSIGNMENT RULES: Pipeline order: Pastor Visit → Team Supervisor → Team Leader → Sponsor → Ongoing Care → Complete. For ASSIGN_TS — set stage to TeamSupervisor and assign teamSupervisorUserId (no gender matching required). For ASSIGN_TL — set stage to TeamLeader and assign teamLeaderUserId. For ASSIGN_SPONSOR — set stage to Sponsor and assign sponsorUserId. ALWAYS match gender for TL and Sponsor: assign male Team Leaders/Sponsors to male visitors, female to female. If already assigned, mention it in your response but still execute. Use visitRecordId and userId from VISITATION PIPELINE and Team Supervisors/Team Leaders/Sponsors data above. Only one ACTION tag per response.\n\n" +
     "Only append [ACTION:...] for clear executable commands. For analysis or conversation respond naturally only.";
 }
 
-async function callAI(messages, members, visitors, attend, giving, prayers, mem, users=[], visitRecords=[]) {
+async function callAI(messages, members, visitors, attend, giving, prayers, mem) {
   const AI_KEY = localStorage.getItem("ntcc_ai_api_key") || "";
   if (!AI_KEY) throw new Error("No API key");
   const systemPrompt = typeof messages === "string"
     ? "You are NTCC AI, a helpful church assistant for Pastor Hall."
-    : buildSys(members, visitors, attend, giving, prayers, mem, users, visitRecords);
+    : buildSys(members, visitors, attend, giving, prayers, mem);
   const msgList = typeof messages === "string"
     ? [{role:"user", content:messages}]
     : messages
@@ -2019,8 +2066,9 @@ const SEED_ROLES=[
   {id:"role_checkin",name:"Check-in",description:"Kids and event check-in station",color:"#ea580c",isSystem:false},
   {id:"role_kitchen",name:"Kitchen",description:"Kitchen and hospitality ministry",color:"#854d0e",isSystem:false},
   {id:"role_nursery",name:"Nursery",description:"Nursery care team",color:"#4f46e5",isSystem:false},
-  {id:"role_team_supervisor",name:"Team Supervisor",description:"Supervises Team Leaders and routes new visitors",color:"#f97316",isSystem:false},
+  {id:"role_campus_admin",name:"Campus Admin",description:"Manages a specific campus — sees only their campus data",color:"#0891b2",isSystem:false},
 ];
+const ICAMPUSES=[{id:"campus_main",name:"Central HQ Campus"}];
 const makeFullPerms=()=>{const p={};MODULES.forEach(m=>{p[m.key]={};m.actions.forEach(a=>p[m.key][a]=true);});return p;};
 const makeEmptyPerms=()=>{const p={};MODULES.forEach(m=>{p[m.key]={};m.actions.forEach(a=>p[m.key][a]=false);});return p;};
 const SEED_PERMS={
@@ -2461,8 +2509,7 @@ function RolesTab({roles,setRoles,permissions,setPermissions,users,currentUser})
   const [modal,setModal] = useState(false);
   const [editR,setEditR] = useState(null);
   const [form,setForm] = useState({name:"",description:"",color:ROLE_COLORS[0]});
-  // Initialize counter above the highest existing numeric role ID to prevent duplicate IDs across remounts
-  const nid = useRef(Math.max(400, ...roles.map(r=>{const m=String(r.id).match(/^role_(\d+)$/);return m?parseInt(m[1])+1:400;})));
+  const nid = useRef(400);
   const isAdmin = currentUser?.superAdmin || (currentUser?.roleId && roles.find(r=>r.id===currentUser.roleId)?.name==="Administrator");
 
   const userCountForRole = roleId => users.filter(u=>u.roleId===roleId).length;
@@ -3951,7 +3998,7 @@ function Visitation({visitors,setVisitors,members,setMembers,users,currentUser,r
   const [tyModal,setTyModal] = useState<any>(null); // {visitor, letterBody, generating}
   const [tyBody,setTyBody] = useState("");
   const [tyGenerating,setTyGenerating] = useState(false);
-  const nid = useRef(Math.max(699,...(visitRecords||[]).map((r:any)=>+(r.id)||0))+1);
+  const nid = useRef(700);
   const pastorDisplayName = (()=>{ const pm = members.find((m:any)=>(m.role||'').toLowerCase().includes('pastor')); return pm ? pm.first+' '+pm.last : (window.__CS__?.pastorName||'Pastor'); })();
 
   const openThankYouLetter = async (v:any) => {
@@ -3969,7 +4016,9 @@ function Visitation({visitors,setVisitors,members,setMembers,users,currentUser,r
 
 Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
     const txt = await callAI([{role:"user",content:prompt}],[],[],[],[],[],{});
-    setTyBody(txt||"");
+    let cleaned=txt||"";
+    if(cleaned.includes('Dear ')){cleaned=cleaned.slice(cleaned.indexOf('Dear '));cleaned=cleaned.replace(/^Dear[^\n]*\n*/i,'').trim();}
+    setTyBody(cleaned);
     setTyGenerating(false);
   };
 
@@ -4018,11 +4067,8 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
   };
 
   useEffect(()=>{
-    setVisitRecords(rs=>{
-      const missing = visitors.filter(v=>!rs.find(r=>r.visitorId===v.id));
-      if(missing.length===0) return rs;
-      return [...rs,...missing.map(v=>({id:nid.current++,visitorId:v.id,stage:"Pastor",createdDate:v.firstVisit||td(),contacts:[],teamSupervisorUserId:null,teamLeaderUserId:null,sponsorUserId:null}))]; 
-    });
+    const missing = visitors.filter(v=>!visitRecords.find(r=>r.visitorId===v.id));
+    if(missing.length>0) setVisitRecords(rs=>[...rs,...missing.map(v=>({id:nid.current++,visitorId:v.id,stage:"Pastor",createdDate:v.firstVisit||td(),contacts:[],teamLeaderUserId:null,sponsorUserId:null}))]);
   },[visitors.length]);
 
   const getRec = vid => visibleRecords.find(r=>r.visitorId===vid);
@@ -4037,7 +4083,6 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
   const getAssigned = rec => {
     if(!rec) return "—";
     if(rec.stage==="Pastor") return pastorDisplayName;
-    if(rec.stage==="TeamSupervisor") return rec.teamSupervisorUserId ? getUName(rec.teamSupervisorUserId) : "Needs Assignment";
     if(rec.stage==="TeamLeader") return rec.teamLeaderUserId ? getUName(rec.teamLeaderUserId) : "Needs Assignment";
     if(rec.stage==="Sponsor" || rec.stage==="OngoingCare") return rec.sponsorUserId ? getUName(rec.sponsorUserId) : "Needs Assignment";
     return "Complete";
@@ -4047,7 +4092,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
 
   // Role-based visibility: Super Admin and Administrator see all visits; others only see visits assigned to them
   const isAdmin = currentUser?.superAdmin || !!(currentUser?.roleId && roles?.find((r:any)=>r.id===currentUser.roleId)?.name==="Administrator");
-  const visibleRecords = isAdmin ? visitRecords : visitRecords.filter((r:any) => r.teamSupervisorUserId===currentUser?.id || r.teamLeaderUserId===currentUser?.id || r.sponsorUserId===currentUser?.id);
+  const visibleRecords = isAdmin ? visitRecords : visitRecords.filter((r:any) => r.teamLeaderUserId===currentUser?.id || r.sponsorUserId===currentUser?.id);
 
   // OngoingCare stats
   const ongoingRecords = visibleRecords.filter(r=>r.stage==="OngoingCare");
@@ -4061,10 +4106,6 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
     const newContacts = [...rec.contacts,contact];
     if(logForm.completed) {
       if(rec.stage==="Pastor") {
-        const upd = {...rec,contacts:newContacts,stage:"TeamSupervisor"};
-        setVisitRecords(rs=>rs.map(r=>r.id===rec.id?upd:r));
-        setLogModal(null); setAssignModal({rec:upd,type:"TeamSupervisor"}); setAssignUid("");
-      } else if(rec.stage==="TeamSupervisor") {
         const upd = {...rec,contacts:newContacts,stage:"TeamLeader"};
         setVisitRecords(rs=>rs.map(r=>r.id===rec.id?upd:r));
         setLogModal(null); setAssignModal({rec:upd,type:"TeamLeader"}); setAssignUid("");
@@ -4094,7 +4135,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
     const type = assignModal.type;
     setVisitRecords(rs=>rs.map(r=>{
       if(r.id!==id) return r;
-      return type==="TeamLeader" ? {...r,teamLeaderUserId:+assignUid} : type==="TeamSupervisor" ? {...r,teamSupervisorUserId:+assignUid} : {...r,sponsorUserId:+assignUid};
+      return type==="TeamLeader" ? {...r,teamLeaderUserId:+assignUid} : {...r,sponsorUserId:+assignUid};
     }));
     setAssignModal(null); setAssignUid("");
   };
@@ -4143,7 +4184,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
   };
 
   // Pipeline columns now include OngoingCare
-  const stageList = ["Pastor","TeamSupervisor","TeamLeader","Sponsor","OngoingCare","Complete"];
+  const stageList = ["Pastor","TeamLeader","Sponsor","OngoingCare","Complete"];
 
   return (
     <div>
@@ -4185,7 +4226,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
 
       {/* PIPELINE TAB */}
       {tab==="pipeline" && (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
           {stageList.map(stage=>{
             const recs = visibleRecords.filter(r=>r.stage===stage);
             const overdueInCol = stage==="OngoingCare" ? recs.filter(r=>{const s=careStatus(r);return s&&s.label==="Overdue";}).length : 0;
@@ -4203,7 +4244,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
                     const v = getV(rec.visitorId);
                     if(!v) return null;
                     const last = getLast(rec);
-                    const needsAssign = (stage==="TeamSupervisor"&&!rec.teamSupervisorUserId)||(stage==="TeamLeader"&&!rec.teamLeaderUserId)||(stage==="Sponsor"&&!rec.sponsorUserId);
+                    const needsAssign = (stage==="TeamLeader"&&!rec.teamLeaderUserId)||(stage==="Sponsor"&&!rec.sponsorUserId);
                     const cs = stage==="OngoingCare" ? careStatus(rec) : null;
                     const due = stage==="OngoingCare" ? getNextDue(rec) : null;
                     return (
@@ -4233,7 +4274,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
                         <div style={{fontSize:11,color:MU,marginBottom:8}}>To: {getAssigned(rec)}</div>
                         {stage!=="Complete" && <Btn onClick={()=>{setLogModal(rec);setLogForm({method:"Call",date:td(),notes:"",completed:false});}} v="ai" style={{fontSize:11,padding:"4px 8px",width:"100%",justifyContent:"center"}}>Log Contact</Btn>}
                         {stage==="Complete" && <div style={{fontSize:11,color:TE,fontWeight:500,textAlign:"center"}}>Fully Complete</div>}
-                        <Btn onClick={()=>openThankYouLetter(v)} v="ghost" style={{fontSize:11,padding:"4px 8px",width:"100%",justifyContent:"center",marginTop:4}}>📄 Thank You Letter</Btn>
+                        <Btn onClick={()=>openThankYouLetter(v)} v="ghost" disabled={!(v.address?.street&&v.address?.city&&v.address?.state&&v.address?.zip)} style={{fontSize:11,padding:"4px 8px",width:"100%",justifyContent:"center",marginTop:4}}>📄 Thank You Letter</Btn>
                       </div>
                     );
                   })}
@@ -4388,7 +4429,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
                         <div style={{display:"flex",gap:6}}>
                           {rec.stage!=="Complete" && <Btn onClick={()=>{setLogModal(rec);setLogForm({method:"Call",date:td(),notes:"",completed:false});}} v="ai" style={{fontSize:11,padding:"4px 8px"}}>Log</Btn>}
                           <Btn onClick={()=>setExpandedId(expandedId===v.id?null:v.id)} v="ghost" style={{fontSize:11,padding:"4px 8px"}}>{expandedId===v.id?"Hide":"History"}</Btn>
-                          <Btn onClick={()=>openThankYouLetter(v)} v="ghost" style={{fontSize:11,padding:"4px 8px"}}>📄 Letter</Btn>
+                          <Btn onClick={()=>openThankYouLetter(v)} v="ghost" disabled={!(v.address?.street&&v.address?.city&&v.address?.state&&v.address?.zip)} style={{fontSize:11,padding:"4px 8px"}}>📄 Letter</Btn>
                         </div>
                       </td>
                     </tr>
@@ -4437,7 +4478,6 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <Stat label="Total Tracked" value={visibleRecords.length}/>
             <Stat label="Pastor Visit" value={visibleRecords.filter(r=>r.stage==="Pastor").length} color={N}/>
-            <Stat label="Team Supervisor" value={visibleRecords.filter(r=>r.stage==="TeamSupervisor").length} color={"#f97316"}/>
             <Stat label="Team Leader" value={visibleRecords.filter(r=>r.stage==="TeamLeader").length} color={PU}/>
             <Stat label="Sponsor" value={visibleRecords.filter(r=>r.stage==="Sponsor").length} color={GR}/>
             <Stat label="Ongoing Care" value={ongoingRecords.length} color={G}/>
@@ -4536,7 +4576,7 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
                 <div>
                   <div style={{fontSize:13,fontWeight:500,color:logForm.completed?GR:TX}}>Mark this contact as completed</div>
                   <div style={{fontSize:11,color:MU}}>
-                    {logModal.stage==="Pastor" ? "Will advance to Team Supervisor" : logModal.stage==="TeamSupervisor" ? "Will advance to Team Leader" :
+                    {logModal.stage==="Pastor" ? "Will advance to Team Leader" :
                      logModal.stage==="TeamLeader" ? "Will advance to Sponsor" :
                      logModal.stage==="Sponsor" ? "Will start 14-day Ongoing Care cycle" :
                      isOngoing ? "Will reset the 14-day check-in timer" : ""}
@@ -4552,24 +4592,22 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
         })()}
       </Modal>
 
-      <Modal open={!!assignModal} onClose={()=>setAssignModal(null)} title={assignModal?"Assign "+(assignModal.type==="TeamLeader"?"Team Leader":assignModal.type==="TeamSupervisor"?"Team Supervisor":"Sponsor"):""} width={420}>
+      <Modal open={!!assignModal} onClose={()=>setAssignModal(null)} title={assignModal?"Assign "+(assignModal.type==="TeamLeader"?"Team Leader":"Sponsor"):""} width={420}>
         {assignModal && (()=>{
           const v = getV(assignModal.rec.visitorId);
           const isTL = assignModal.type==="TeamLeader";
-          const isTS = assignModal.type==="TeamSupervisor";
           return (
             <div>
               <div style={{background:GL,border:"0.5px solid "+G,borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#7a5c10",lineHeight:1.6}}>
-                {isTS?pastorDisplayName+" completed the first visit for ":isTL?"The Team Supervisor handed off ":"The Team Leader completed follow-up for "}
-                <strong>{v?.first} {v?.last}</strong>. Assign a {isTS?"Team Supervisor":isTL?"Team Leader":"Sponsor"} to continue.
+                {isTL?pastorDisplayName+" completed the first visit for ":"The Team Leader completed follow-up for "}
+                <strong>{v?.first} {v?.last}</strong>. Assign a {isTL?"Team Leader":"Sponsor"} to continue.
               </div>
-              <Fld label={"Select "+(isTS?"Team Supervisor":isTL?"Team Leader":"Sponsor")+" *"}>
+              <Fld label={"Select "+(isTL?"Team Leader":"Sponsor")+" *"}>
                 <select value={assignUid} onChange={e=>setAssignUid(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",background:W,boxSizing:"border-box"}}>
                   <option value="">Select a user</option>
                   {activeUsers.filter(u=>{
                     const r=roles.find((x:any)=>x.id===u.roleId);
                     if(isTL) return r?.name==="Team Leader";
-                    if(isTS) return r?.name==="Team Supervisor";
                     return r?.name==="Sponsor";
                   }).map(u=>{
                     const m = members.find(x=>x.id===u.memberId);
@@ -5849,7 +5887,7 @@ const MiniStat = ({label,value,color=N,sub}:any) => (
     {sub && <div style={{fontSize:10,color:MU,marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</div>}
   </div>
 );
-function People({members,setMembers,visitors,setVisitors,attendance,giving,setGiving,prayers,setPrayers,groups,setGroups,grpMeetings,setGrpMeetings,visitRecords,setVisitRecords,checkIns,setCheckIns,setView,canViewGiving,currentUser,roles=[],children=[],setChildren=null}:any) {
+function People({members,setMembers,visitors,setVisitors,attendance,giving,setGiving,prayers,setPrayers,groups,setGroups,grpMeetings,setGrpMeetings,visitRecords,setVisitRecords,checkIns,setCheckIns,setView,canViewGiving,currentUser,roles=[],children=[],setChildren=null,campuses=[],activeCampusId='all'}:any) {
   const [tab,setTab] = useState("members");
   const [search,setSearch] = useState("");
   const [showSug,setShowSug] = useState(false);
@@ -5874,6 +5912,8 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
   const [groupAssignOpen,setGroupAssignOpen] = useState(false);
   const [roleAssignOpen,setRoleAssignOpen] = useState(false);
   const [roleAssignVal,setRoleAssignVal] = useState("");
+  const [campusAssignOpen,setCampusAssignOpen] = useState(false);
+  const [campusAssignVal,setCampusAssignVal] = useState("");
   const sf2 = (k:string) => (v:any) => setFilters(f=>({...f,[k]:v}));
   const clearFilters = () => setFilters({...BLANK_FILTERS});
   const activeFiltersCount = Object.entries(filters).filter(([k,v])=>k==="birthdayThisMonth"?v:v!=="all").length;
@@ -5920,6 +5960,9 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
   };
 
   const applyFilters = (list:any[], q:string = "") => list.filter(p => {
+    if(activeCampusId && activeCampusId!=='all') {
+      if((p.campus||'campus_main')!==activeCampusId) return false;
+    }
     if(q.length>0) { if(!((p.first||"")+" "+(p.last||"")).toLowerCase().includes(q)) return false; }
     if(tab==="members") {
       if(filters.status!=="all" && p.status!==filters.status) return false;
@@ -6179,7 +6222,8 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
           <Btn v="gold" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportCSV(selectedPeople)}>📤 Export CSV</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setGroupAssignOpen(true)}>👥 Assign Group</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setRoleAssignVal("");setRoleAssignOpen(true);}}>🏷️ Set Role</Btn>
-          <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>printDirectory(selectedPeople)}>🖸️ Print</Btn>
+          {campuses.length>1&&<Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{setCampusAssignVal(campuses[0].id);setCampusAssignOpen(true);}}>🏛 Campus</Btn>}
+          <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>printDirectory(selectedPeople)}>🖨️ Print</Btn>
           <Btn v="ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{
             const lines = selectedPeople.map(p=>p.first+" "+p.last+(p.phone?" | "+p.phone:"")+(p.email?" | "+p.email:"")).join("\n");
             navigator.clipboard.writeText(lines).then(()=>alert("Copied "+selected.size+" contacts to clipboard."));
@@ -6321,6 +6365,28 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
             setSelected(new Set());
           }}>Apply Role</Btn>
           <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setRoleAssignOpen(false)}>Cancel</Btn>
+        </div>
+      </Modal>
+
+      {/* ── Assign Campus Modal ──────────────────────────────────── */}
+      <Modal open={campusAssignOpen} onClose={()=>setCampusAssignOpen(false)} title={"🏛 Assign Campus to "+selected.size+" Person(s)"} width={380}>
+        <Fld label="Campus">
+          <select value={campusAssignVal} onChange={e=>setCampusAssignVal(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>
+            {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Fld>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <Btn style={{flex:1,justifyContent:"center"}} onClick={()=>{
+            if(!campusAssignVal){return;}
+            const ids = new Set(selectedPeople.map((p:any)=>p.id));
+            setMembers((ms:any[])=>ms.map(m=>ids.has(m.id)?{...m,campus:campusAssignVal}:m));
+            setVisitors((vs:any[])=>vs.map(v=>ids.has(v.id)?{...v,campus:campusAssignVal}:v));
+            setCampusAssignOpen(false);
+            const cName = campuses.find((c:any)=>c.id===campusAssignVal)?.name||campusAssignVal;
+            alert(selected.size+" person(s) assigned to "+cName+".");
+            setSelected(new Set());
+          }}>Assign Campus</Btn>
+          <Btn v="ghost" style={{flex:1,justifyContent:"center"}} onClick={()=>setCampusAssignOpen(false)}>Cancel</Btn>
         </div>
       </Modal>
 
@@ -6729,6 +6795,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
                     </div>
                   )}
                   <Fld label="Family Name"><Inp value={editForm.family||""} onChange={ef("family")} placeholder="Lee Household"/></Fld>
+                  {campuses.length>1&&<Fld label="Campus"><select value={editForm.campus||'campus_main'} onChange={e=>ef("campus")(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:TX,background:"#fff",boxSizing:"border-box" as any}}>{campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Fld>}
                 </SectionCard>
 
                 <SectionCard title="Address">
@@ -7011,7 +7078,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
 }
 
 // ── ATTENDANCE ──
-function Attendance({attendance,setAttendance,setView}:any) {
+function Attendance({attendance,setAttendance,setView,activeCampusId='all',campuses=[]}:any) {
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   const [insight,setInsight] = useState("");
@@ -7020,7 +7087,7 @@ function Attendance({attendance,setAttendance,setView}:any) {
   const sf = k => v => setForm(f=>({...f,[k]:v}));
   const save = () => {
     if(!form.date||!form.count){alert("Date and count required.");return;}
-    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,id:nid.current++},...attendance]);
+    setAttendance([{...form,count:+form.count,members:+form.members||0,visitors:+form.visitors||0,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...attendance]);
     setModal(false);
     setForm({date:td(),service:"Sunday Morning Worship",count:"",members:"",visitors:"",notes:""});
   };
@@ -7030,15 +7097,16 @@ function Attendance({attendance,setAttendance,setView}:any) {
     const txt = await callAI([{role:"user",content:"Analyze NTCC attendance for Pastor Hall in 2-3 sentences: "+data}],[],[],[],[],[],{});
     setInsight(txt); setLoad(false);
   };
-  const avg = attendance.length ? Math.round(attendance.reduce((a,s)=>a+s.count,0)/attendance.length) : 0;
-  const best = [...attendance].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
+  const filtAtt = activeCampusId&&activeCampusId!=='all' ? attendance.filter((a:any)=>(a.campus||'campus_main')===activeCampusId) : attendance;
+  const avg = filtAtt.length ? Math.round(filtAtt.reduce((a,s)=>a+s.count,0)/filtAtt.length) : 0;
+  const best = [...filtAtt].sort((a,b)=>b.count-a.count)[0]||{count:0,service:""};
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:20}}>
-        <Stat label="Services" value={attendance.length}/>
+        <Stat label="Services" value={filtAtt.length}/>
         <Stat label="Avg Attendance" value={avg} color={BL}/>
         <Stat label="Best Service" value={best.count} sub={best.service} color={GR}/>
-        <Stat label="Total Visitors" value={attendance.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
+        <Stat label="Total Visitors" value={filtAtt.reduce((a,s)=>a+s.visitors,0)} color={AM}/>
       </div>
       <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:16,marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -7062,7 +7130,7 @@ function Attendance({attendance,setAttendance,setView}:any) {
             </tr>
           </thead>
           <tbody>
-            {attendance.map(a=>(
+            {filtAtt.map(a=>(
               <tr key={a.id} style={{borderBottom:"0.5px solid "+BR}}>
                 <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{fd(a.date)}</td>
                 <td style={{padding:"10px 14px",fontSize:13}}>{a.service}</td>
@@ -8168,7 +8236,7 @@ function GivingHistory({giving,members,visitors}){
   );
 }
 
-function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[]}:any) {
+function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledges,members,visitors,weeklyReports,setWeeklyReports,emailTemplates,currentUser=null,roles=[],activeCampusId='all',campuses=[]}:any) {
   const [tab,setTab] = useState("giving");
   const [modal,setModal] = useState(false);
   const [form,setForm] = useState({date:td(),name:"",category:"Tithe",amount:"",method:"Cash",notes:""});
@@ -8233,7 +8301,8 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
       setNameSugg(hits); setShowSugg(hits.length>0);
     } else { setShowSugg(false); }
   };
-  const thisMonth = giving.filter(g=>g.date.startsWith("2026-04"));
+  const filtGiving = activeCampusId&&activeCampusId!=='all' ? giving.filter((g:any)=>(g.campus||'campus_main')===activeCampusId) : giving;
+  const thisMonth = filtGiving.filter(g=>g.date.startsWith("2026-04"));
   const total = thisMonth.reduce((a,g)=>a+g.amount,0);
   const tithe = thisMonth.filter(g=>g.category==="Tithe").reduce((a,g)=>a+g.amount,0);
   const offering = thisMonth.filter(g=>g.category==="Offering").reduce((a,g)=>a+g.amount,0);
@@ -8248,7 +8317,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
     if(editingId) {
       setGiving(giving.map(r=>r.id===editingId ? {...r,category:form.category,amount:+form.amount,method:form.method,notes:form.notes} : r));
     } else {
-      setGiving([{...form,amount:+form.amount,id:nid.current++},...giving]);
+      setGiving([{...form,amount:+form.amount,campus:activeCampusId&&activeCampusId!=='all'?activeCampusId:'campus_main',id:nid.current++},...giving]);
     }
     setModal(false);
     setEditingId(null);
@@ -8288,7 +8357,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
         <Stat label="April Total" value={f$(total)} color={GR}/>
         <Stat label="Tithes" value={f$(tithe)} sub="This month"/>
         <Stat label="Offerings" value={f$(offering)} sub="This month" color={G}/>
-        <Stat label="Records" value={giving.length} sub="All time"/>
+        <Stat label="Records" value={filtGiving.length} sub="All time"/>
       </div>
       {/* Pastor's Draw Card */}
       {(()=>{
@@ -8351,7 +8420,7 @@ function Giving({giving,setGiving,pledgeDrives,setPledgeDrives,pledges,setPledge
             </tr>
           </thead>
           <tbody>
-            {giving.map(g=>{
+            {filtGiving.map(g=>{
               const person = members.find(m=>(m.first+" "+m.last)===g.name) || visitors.find(v=>(v.first+" "+v.last)===g.name);
               const personEmail = person?.email || "";
               return (
@@ -8652,7 +8721,7 @@ function Prayer({prayers,setPrayers,portalMode=false,portalMember=null}:any) {
 }
 
 // ── AI ASSISTANT with ElevenLabs ──
-function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,attendance,setAttendance,giving,setGiving,prayers,setView,isMobile,visitRecords=[],setVisitRecords,users=[],canChat=true,canExecute=true,canManageSettings=true}) {
+function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,attendance,setAttendance,giving,setGiving,prayers,setView,isMobile}) {
   const [input,setInput] = useState("");
   const [load,setLoad] = useState(false);
   const [ttsOn,setTtsOn] = useState(()=>localStorage.getItem("ntcc_voice_on")!=="false");
@@ -8678,14 +8747,10 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
   const vRef = useRef(visitors);
   const aRef = useRef(attendance);
   const gRef = useRef(giving);
-  const vrRef = useRef(visitRecords);
-  const usersRef = useRef(users);
   useEffect(()=>{mRef.current=members;},[members]);
   useEffect(()=>{vRef.current=visitors;},[visitors]);
   useEffect(()=>{aRef.current=attendance;},[attendance]);
   useEffect(()=>{gRef.current=giving;},[giving]);
-  useEffect(()=>{vrRef.current=visitRecords;},[visitRecords]);
-  useEffect(()=>{usersRef.current=users;},[users]);
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[aiChat,load]);
 
   useEffect(()=>{
@@ -8744,21 +8809,6 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
     else if(type==="UPDATE_MEMBER") setMembers(m=>m.map(x=>x.id===+data.id?{...x,...data}:x));
     else if(type==="DELETE_MEMBER") { if(confirm("Delete this member?")) setMembers(m=>m.filter(x=>x.id!==+data.id)); }
     else if(type==="DELETE_VISITOR") { if(confirm("Delete this visitor?")) setVisitors(v=>v.filter(x=>x.id!==+data.id)); }
-    else if(type==="ASSIGN_TS") {
-      const existing = vrRef.current.find((r:any)=>r.id===+data.visitRecordId);
-      if(existing?.teamSupervisorUserId) setBanner("⚠️ Visitor already had a Team Supervisor — reassigning now. "+conf);
-      if(setVisitRecords) setVisitRecords((rs:any[])=>rs.map(r=>r.id===+data.visitRecordId?{...r,teamSupervisorUserId:+data.userId,stage:"TeamSupervisor"}:r));
-    }
-    else if(type==="ASSIGN_TL") {
-      const existing = vrRef.current.find((r:any)=>r.id===+data.visitRecordId);
-      if(existing?.teamLeaderUserId) setBanner("⚠️ Visitor already had a Team Leader — reassigning now. "+conf);
-      if(setVisitRecords) setVisitRecords((rs:any[])=>rs.map(r=>r.id===+data.visitRecordId?{...r,teamLeaderUserId:+data.userId,stage:"TeamLeader"}:r));
-    }
-    else if(type==="ASSIGN_SPONSOR") {
-      const existing = vrRef.current.find((r:any)=>r.id===+data.visitRecordId);
-      if(existing?.sponsorUserId) setBanner("⚠️ Visitor already had a Sponsor — reassigning now. "+conf);
-      if(setVisitRecords) setVisitRecords((rs:any[])=>rs.map(r=>r.id===+data.visitRecordId?{...r,sponsorUserId:+data.userId,stage:"Sponsor"}:r));
-    }
     else if(type==="NAVIGATE") setView(data.section);
     setBanner(conf||"Action completed.");
     setTimeout(()=>setBanner(null), 5000);
@@ -8766,7 +8816,6 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
   };
 
   const send = async override => {
-    if(!canChat) return;
     const msg = (override||input).trim();
     if(!msg||load) return;
     setInput("");
@@ -8774,10 +8823,10 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
     setAiChat(nc);
     setLoad(true);
     try {
-      const raw = await callAI(nc, mRef.current, vRef.current, aRef.current, gRef.current, prayers, mem, usersRef.current, vrRef.current);
+      const raw = await callAI(nc, mRef.current, vRef.current, aRef.current, gRef.current, prayers, mem);
       const {clean,action} = parseAction(raw);
       setAiChat([...nc,{role:"assistant",content:clean}]);
-      if(action) { if(canExecute) execAction(action); else setBanner({type:"warn",msg:"You don't have permission to execute AI actions."}); } else updateMem(null);
+      if(action) execAction(action); else updateMem(null);
       speak(clean);
     } catch(e) {
       const msg = (e as any)?.message||String(e);
@@ -8805,7 +8854,7 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
   };
 
   const topCmds = Object.entries(cmdCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
-  const QUICK = ["Give me a full church summary","Who needs follow-up?","Add a new member","Log today attendance","Record a tithe","Show inactive members","Generate a giving report","Draft a Sunday announcement","Auto-suggest Team Supervisor assignments for all Pastor-stage visitors","Auto-suggest Team Leader assignments for all Team-Supervisor-stage visitors","Auto-suggest Sponsor assignments for all Team Leader-stage visitors"];
+  const QUICK = ["Give me a full church summary","Who needs follow-up?","Add a new member","Log today attendance","Record a tithe","Show inactive members","Generate a giving report","Draft a Sunday announcement"];
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 110px)"}}>
@@ -8835,7 +8884,7 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
             {ttsOn?"🔊 Voice On":"🔇 Voice Off"}
           </div>
           <button onClick={()=>setShowMem(v=>!v)} style={{background:showMem?"#ffffff22":"#ffffff12",border:"0.5px solid #ffffff44",borderRadius:8,padding:"5px 11px",cursor:"pointer",color:"#fff",fontSize:12}}>Memory</button>
-          {canManageSettings && <button onClick={()=>setShowSettings(true)} style={{background:"#ffffff12",border:"0.5px solid #ffffff44",borderRadius:8,padding:"5px 11px",cursor:"pointer",color:"#fff",fontSize:12}}>Voice Settings</button>}
+          <button onClick={()=>setShowSettings(true)} style={{background:"#ffffff12",border:"0.5px solid #ffffff44",borderRadius:8,padding:"5px 11px",cursor:"pointer",color:"#fff",fontSize:12}}>Voice Settings</button>
         </div>
       </div>
       {banner && (
@@ -8937,12 +8986,12 @@ function AIAssist({aiChat,setAiChat,members,setMembers,visitors,setVisitors,atte
             <div ref={endRef}/>
           </div>
           <div style={{marginTop:12,background:W,borderRadius:12,padding:"10px 14px",border:"1.5px solid "+BR,display:"flex",gap:10,alignItems:"flex-end"}}>
-            <textarea ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder={canChat?"Talk to me, Pastor Hall — give a command or ask anything...":"You don't have permission to use AI chat."} rows={2} disabled={!canChat} style={{flex:1,resize:"none",border:"none",outline:"none",fontSize:13,fontFamily:"inherit",lineHeight:1.6,background:"transparent",opacity:canChat?1:0.5,cursor:canChat?"text":"not-allowed"}}/>
+            <textarea ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Talk to me, Pastor Hall — give a command or ask anything..." rows={2} style={{flex:1,resize:"none",border:"none",outline:"none",fontSize:13,fontFamily:"inherit",lineHeight:1.6,background:"transparent"}}/>
             <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-              <button onClick={startListening} disabled={!canChat} style={{width:38,height:38,borderRadius:"50%",border:"none",background:listening?"#fee2e2":N+"18",cursor:canChat?"pointer":"not-allowed",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",color:listening?RE:N,opacity:canChat?1:0.5}}>
+              <button onClick={startListening} style={{width:38,height:38,borderRadius:"50%",border:"none",background:listening?"#fee2e2":N+"18",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",color:listening?RE:N}}>
                 {listening?"Stop":"Mic"}
               </button>
-              <Btn onClick={()=>{_elAudio.src=SILENT_WAV;_elAudio.play().catch(()=>{});send();}} disabled={load||!input.trim()||!canChat} style={{padding:"9px 18px"}}>{load?"...": "Send"}</Btn>
+              <Btn onClick={()=>{_elAudio.src=SILENT_WAV;_elAudio.play().catch(()=>{});send();}} disabled={load||!input.trim()} style={{padding:"9px 18px"}}>{load?"...":"Send"}</Btn>
             </div>
           </div>
           <div style={{fontSize:11,color:MU,marginTop:6,textAlign:"center"}}>Enter to send - Shift+Enter for new line - Mic for voice input - commands execute live</div>
@@ -9262,39 +9311,7 @@ function CheckInPortal({classrooms,children,setChildren,kidsCheckIns,setKidsChec
   );
 }
 
-function GraduatedRoster({children,setChildren}:any){
-  const graduated=(children as any[]).filter((c:any)=>c.status==="Graduated"||(c.dob&&(calcAge(c.dob) as any)>=18));
-  return(
-    <div>
-      <div style={{marginBottom:16,fontSize:13,color:MU}}>Students who have graduated (age 18+ or manually marked). Showing {graduated.length} student{graduated.length!==1?"s":""}.</div>
-      {graduated.length===0?(
-        <div style={{textAlign:"center",padding:60,color:MU,fontSize:14}}>No graduated students yet.</div>
-      ):(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:14}}>
-          {graduated.map((ch:any)=>{
-            const age=ch.dob?(calcAge(ch.dob) as any):null;
-            const autoGrad=age>=18;
-            return(
-              <div key={ch.id} style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:16}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                  <Av f={ch.first} l={ch.last} sz={36}/>
-                  <div>
-                    <div style={{fontWeight:600,fontSize:14,color:N}}>{ch.first} {ch.last}</div>
-                    <div style={{fontSize:12,color:MU}}>{age?"Age "+age:"Age unknown"}</div>
-                  </div>
-                  <span style={{marginLeft:"auto",fontSize:10,background:autoGrad?"#f3e8ff":"#d1fae5",color:autoGrad?"#7c3aed":"#065f46",borderRadius:10,padding:"2px 7px",fontWeight:600}}>{autoGrad?"Auto":"Manual"}</span>
-                </div>
-                {(ch.parentName||ch.parentPhone)&&<div style={{fontSize:12,paddingTop:8,borderTop:"0.5px solid "+BR,marginBottom:8}}><div style={{fontWeight:500,color:TX}}>{ch.parentName||"—"}</div>{ch.parentPhone&&<div style={{color:MU}}>{ch.parentPhone}</div>}</div>}
-                {ch.status==="Graduated"&&!autoGrad&&<Btn v="outline" onClick={()=>setChildren((cs:any[])=>cs.map(c=>c.id===ch.id?{...c,status:"Active"}:c))} style={{fontSize:11,padding:"4px 9px",marginTop:4}}>↩ Move Back</Btn>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-function ChildrenRoster({children,setChildren,classrooms,members,setMembers,kidsCheckIns,incidents}:any){
+function ChildrenRoster({children,setChildren,classrooms,members,setMembers,kidsCheckIns,incidents}){
   const [search,setSearch]=useState("");
   const [cDrop,setCDrop]=useState(false);
   const [filterGrade,setFilterGrade]=useState("all");
@@ -9305,8 +9322,7 @@ function ChildrenRoster({children,setChildren,classrooms,members,setMembers,kids
   const [parentQuery,setParentQuery]=useState("");
   const [parentSugs,setParentSugs]=useState<any[]>([]);
   const nid=useRef(700);
-  const isGrad=(c:any)=>c.status==="Graduated"||(c.dob&&(calcAge(c.dob) as any)>=18);
-  const filtered=children.filter((c:any)=>{if(isGrad(c))return false;if(search&&!(c.first+" "+c.last).toLowerCase().includes(search.toLowerCase()))return false;if(filterGrade!=="all"&&c.grade!==filterGrade)return false;return true;});
+  const filtered=children.filter(c=>{if(search&&!(c.first+" "+c.last).toLowerCase().includes(search.toLowerCase()))return false;if(filterGrade!=="all"&&c.grade!==filterGrade)return false;return true;});
   useEffect(()=>{
     if(form.parentMemberId){setParentSugs([]);return;}
     if(parentQuery.length<2){setParentSugs([]);return;}
@@ -9370,7 +9386,7 @@ function ChildrenRoster({children,setChildren,classrooms,members,setMembers,kids
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr style={{background:"#f8f9fc"}}>{["Child","Age","Level","Parent","Medical","Last Visit","Actions"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:MU,textTransform:"uppercase",letterSpacing:0.5,borderBottom:"0.5px solid "+BR}}>{h}</th>)}</tr></thead>
           <tbody>
-            {filtered.map(ch=>{const last=[...kidsCheckIns].filter(ci=>ci.childId===ch.id).sort((a,b)=>b.date.localeCompare(a.date))[0];const hasMed=(ch.allergies?.length>0||ch.medical?.length>0);const hasOpenInc=(incidents||[]).some(i=>i.childId===ch.id&&i.status!=="Resolved");const hasParent=!!(ch.parentName||ch.parentMemberId);return (<tr key={ch.id} style={{borderBottom:"0.5px solid "+BR}} onMouseEnter={e=>e.currentTarget.style.background="#f8f9fc"} onMouseLeave={e=>e.currentTarget.style.background=W}><td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av f={ch.first} l={ch.last} sz={30}/><div><div style={{fontSize:13,fontWeight:500}}>{ch.first} {ch.last}</div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>{hasOpenInc&&<span style={{fontSize:10,background:"#fee2e2",color:RE,borderRadius:10,padding:"1px 6px",fontWeight:600}}>Incident</span>}{!hasParent&&<span style={{fontSize:10,background:"#fef3c7",color:"#b45309",borderRadius:10,padding:"1px 6px",fontWeight:600}}>No parent</span>}</div></div></div></td><td style={{padding:"10px 14px",fontSize:13}}>{ch.dob?calcAge(ch.dob):<span style={{color:MU,fontStyle:"italic"}}>—</span>}</td><td style={{padding:"10px 14px",fontSize:13}}>{ch.grade||<span style={{color:MU,fontStyle:"italic"}}>—</span>}</td><td style={{padding:"10px 14px",fontSize:13}}><div style={{fontWeight:ch.parentMemberId?500:400,color:ch.parentName?TX:MU,fontStyle:ch.parentName?"normal":"italic"}}>{ch.parentName||"Not linked"}</div><div style={{fontSize:11,color:MU}}>{ch.parentPhone||""}</div>{ch.parentMemberId&&<span style={{fontSize:10,background:"#d1fae5",color:"#065f46",borderRadius:10,padding:"1px 6px",fontWeight:600,display:"inline-block",marginTop:2}}>✓ linked</span>}</td><td style={{padding:"10px 14px"}}>{hasMed?(<span style={{fontSize:11,background:"#fee2e2",color:RE,borderRadius:4,padding:"2px 7px",fontWeight:500}}>Alert</span>):(<span style={{fontSize:11,color:MU}}>None</span>)}</td><td style={{padding:"10px 14px",fontSize:12,color:MU}}>{last?fd(last.date):"Never"}</td><td style={{padding:"10px 14px"}}><div style={{display:"flex",gap:6}}><Btn onClick={()=>openEdit(ch)} v="outline" style={{fontSize:11,padding:"4px 9px"}}>✎ Edit</Btn><Btn onClick={()=>{if(confirm("Mark "+ch.first+" "+ch.last+" as Graduated?"))setChildren((cs:any[])=>cs.map(c=>c.id===ch.id?{...c,status:"Graduated"}:c));}} v="outline" style={{fontSize:11,padding:"4px 9px",color:"#7c3aed",borderColor:"#7c3aed"}}>🎓 Graduate</Btn><Btn onClick={e=>{e.stopPropagation();if(confirm("Remove "+ch.first+" "+ch.last+"?"))setChildren((cs:any[])=>cs.filter(c=>c.id!==ch.id));}} v="danger" style={{fontSize:11,padding:"4px 8px"}}>✕</Btn></div></td></tr>);})}
+            {filtered.map(ch=>{const last=[...kidsCheckIns].filter(ci=>ci.childId===ch.id).sort((a,b)=>b.date.localeCompare(a.date))[0];const hasMed=(ch.allergies?.length>0||ch.medical?.length>0);const hasOpenInc=(incidents||[]).some(i=>i.childId===ch.id&&i.status!=="Resolved");const hasParent=!!(ch.parentName||ch.parentMemberId);return (<tr key={ch.id} style={{borderBottom:"0.5px solid "+BR}} onMouseEnter={e=>e.currentTarget.style.background="#f8f9fc"} onMouseLeave={e=>e.currentTarget.style.background=W}><td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:10}}><Av f={ch.first} l={ch.last} sz={30}/><div><div style={{fontSize:13,fontWeight:500}}>{ch.first} {ch.last}</div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>{hasOpenInc&&<span style={{fontSize:10,background:"#fee2e2",color:RE,borderRadius:10,padding:"1px 6px",fontWeight:600}}>Incident</span>}{!hasParent&&<span style={{fontSize:10,background:"#fef3c7",color:"#b45309",borderRadius:10,padding:"1px 6px",fontWeight:600}}>No parent</span>}</div></div></div></td><td style={{padding:"10px 14px",fontSize:13}}>{ch.dob?calcAge(ch.dob):<span style={{color:MU,fontStyle:"italic"}}>—</span>}</td><td style={{padding:"10px 14px",fontSize:13}}>{ch.grade||<span style={{color:MU,fontStyle:"italic"}}>—</span>}</td><td style={{padding:"10px 14px",fontSize:13}}><div style={{fontWeight:ch.parentMemberId?500:400,color:ch.parentName?TX:MU,fontStyle:ch.parentName?"normal":"italic"}}>{ch.parentName||"Not linked"}</div><div style={{fontSize:11,color:MU}}>{ch.parentPhone||""}</div>{ch.parentMemberId&&<span style={{fontSize:10,background:"#d1fae5",color:"#065f46",borderRadius:10,padding:"1px 6px",fontWeight:600,display:"inline-block",marginTop:2}}>✓ linked</span>}</td><td style={{padding:"10px 14px"}}>{hasMed?(<span style={{fontSize:11,background:"#fee2e2",color:RE,borderRadius:4,padding:"2px 7px",fontWeight:500}}>Alert</span>):(<span style={{fontSize:11,color:MU}}>None</span>)}</td><td style={{padding:"10px 14px",fontSize:12,color:MU}}>{last?fd(last.date):"Never"}</td><td style={{padding:"10px 14px"}}><div style={{display:"flex",gap:6}}><Btn onClick={()=>openEdit(ch)} v="outline" style={{fontSize:11,padding:"4px 9px"}}>✎ Edit</Btn><Btn onClick={e=>{e.stopPropagation();if(confirm("Remove "+ch.first+" "+ch.last+"?"))setChildren((cs:any[])=>cs.filter(c=>c.id!==ch.id));}} v="danger" style={{fontSize:11,padding:"4px 8px"}}>✕</Btn></div></td></tr>);})}
             {filtered.length===0&&<tr><td colSpan={7} style={{padding:40,textAlign:"center",color:MU}}>No children registered.</td></tr>}
           </tbody>
         </table>
@@ -10031,7 +10047,7 @@ function Education({members,setMembers,visitors,users,roles,children,setChildren
   const today=td();
   const todayCI=(kidsCheckIns as any[]).filter((c:any)=>c.date===today);
   const openIncidents=(incidents as any[]).filter((i:any)=>i.status!=="Resolved").length;
-  const TABS=[{id:"dashboard",label:"Overview"},{id:"checkin",label:"Check-In"},{id:"rollcall",label:"Roll Call"},{id:"children",label:"Children"},{id:"graduated",label:"Graduated"},{id:"progress",label:"Progress"},{id:"classrooms",label:"Classrooms"},{id:"teachers",label:"Teachers"},{id:"incidents",label:"Incidents"},{id:"reports",label:"Reports"},{id:"printer",label:"🖨 Printer"}];
+  const TABS=[{id:"dashboard",label:"Overview"},{id:"checkin",label:"Check-In"},{id:"rollcall",label:"Roll Call"},{id:"children",label:"Children"},{id:"progress",label:"Progress"},{id:"classrooms",label:"Classrooms"},{id:"teachers",label:"Teachers"},{id:"incidents",label:"Incidents"},{id:"reports",label:"Reports"},{id:"printer",label:"🖨 Printer"}];
   return(
     <div>
       <div style={{display:"flex",marginBottom:20,background:W,borderRadius:10,border:"0.5px solid "+BR,overflow:"hidden",flexWrap:"wrap"}}>
@@ -10045,7 +10061,6 @@ function Education({members,setMembers,visitors,users,roles,children,setChildren
       {tab==="checkin"&&<CheckInPortal classrooms={classrooms} children={children} setChildren={setChildren} kidsCheckIns={kidsCheckIns} setKidsCheckIns={setKidsCheckIns} members={members} printerConfig={printerConfig}/>}
       {tab==="rollcall"&&<ClassRollCall classrooms={classrooms} children={children} rollCalls={rollCalls} setRollCalls={setRollCalls} teacherSchedule={teacherSchedule} users={users} members={members} cs={cs}/>}
       {tab==="children"&&<ChildrenRoster children={children} setChildren={setChildren} classrooms={classrooms} members={members} setMembers={setMembers} kidsCheckIns={kidsCheckIns} incidents={incidents}/>}
-      {tab==="graduated"&&<GraduatedRoster children={children} setChildren={setChildren}/>}
       {tab==="progress"&&<ChildProgress children={children} classrooms={classrooms} rollCalls={rollCalls} progressNotes={progressNotes} setProgressNotes={setProgressNotes} cs={cs}/>}
       {tab==="classrooms"&&<ClassroomsManager classrooms={classrooms} setClassrooms={setClassrooms} teacherSchedule={teacherSchedule} users={users} members={members} kidsCheckIns={kidsCheckIns}/>}
       {tab==="teachers"&&<TeacherScheduleMgr classrooms={classrooms} teacherSchedule={teacherSchedule} setTeacherSchedule={setTeacherSchedule} users={users} members={members} roles={roles}/>}
@@ -10062,7 +10077,7 @@ function Education({members,setMembers,visitors,users,roles,children,setChildren
 const ALLERGY_OPTIONS=["Peanuts","Tree Nuts","Milk/Dairy","Eggs","Wheat/Gluten","Soy","Fish","Shellfish","Latex","Bee Stings","Penicillin","Aspirin","Ibuprofen","Sulfa Drugs"];
 const MEDICAL_OPTIONS=["Diabetes","High Blood Pressure","Heart Condition","Asthma","Epilepsy/Seizures","Mobility Impairment","Vision Impairment","Hearing Impairment","Cancer","Kidney Disease","Thyroid Disorder","Depression/Anxiety","PTSD","Autism Spectrum"];
 
-function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,roles,permissions,setView,prospects,setProspects,children=[],setChildren=null}:any){
+function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,roles,permissions,setView,prospects,setProspects,children=[],setChildren=null,campuses=[]}:any){
   const canAdd = checkPermission(currentUser,roles,permissions,"directory","create");
   const addedByName = (()=>{
     if(!currentUser) return "Unknown";
@@ -10082,11 +10097,13 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
   const [spouseSug,setSpouseSug] = useState<any[]>([]);
   const [spouseLinked,setSpouseLinked] = useState<any>(null);
   const blankForm=()=>({
-    first:"",last:"",phone:"",email:"",gender:"",
+    first:"",last:"",phone:"",email:"",gender:"Male",
     // Member fields
     status:"Active",role:"",joined:td(),family:"",
     // Visitor fields
     stage:"First Visit",sponsor:"",firstVisit:td(),
+    // Campus
+    campus:campuses.length>0?campuses[0].id:"campus_main",
     // Address
     address:{street:"",city:"",state:"AZ",zip:""},
     // Personal
@@ -10112,7 +10129,6 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
 
   const sf=(k:string)=>(v:any)=>setForm((f:any)=>({...f,[k]:v}));
   const sfa=(k:string)=>(v:any)=>setForm((f:any)=>({...f,address:{...f.address,[k]:v}}));
-  const fmtPhone=(v:string)=>{const d=v.replace(/\D/g,'').slice(0,10);if(d.length<=3)return d;if(d.length<=6)return`(${d.slice(0,3)}) ${d.slice(3)}`;return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;};
   const toggleArr=(field:string,item:string)=>setForm((f:any)=>{
     const arr:string[]=f[field]||[];
     return {...f,[field]:arr.includes(item)?arr.filter((x:string)=>x!==item):[...arr,item]};
@@ -10198,7 +10214,6 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
 
   const handleSave=()=>{
     if(!form.first||!form.last){alert("First and last name are required.");return;}
-    if(!form.gender){alert("Please select a gender.");return;}
     const dups=checkDups();
     if(dups.length>0){
       setDupWarning(dups);
@@ -10310,7 +10325,7 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:4}}>
           <Fld label="First Name *"><Inp value={form.first} onChange={sf("first")} placeholder="First name"/></Fld>
           <Fld label="Last Name *"><Inp value={form.last} onChange={sf("last")} placeholder="Last name"/></Fld>
-          <Fld label="Phone"><Inp value={form.phone} onChange={v=>sf("phone")(fmtPhone(v))} placeholder="(602) 555-0100"/></Fld>
+          <Fld label="Phone"><Inp value={form.phone} onChange={sf("phone")} placeholder="(602) 555-0100"/></Fld>
           <Fld label="Email"><Inp value={form.email} onChange={sf("email")} placeholder="email@example.com"/></Fld>
         </div>
         <Fld label="Gender *">
@@ -10324,6 +10339,14 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
           </div>
         </Fld>
         <Fld label="Family / Household"><Inp value={form.family} onChange={sf("family")} placeholder="e.g. Smith Household"/></Fld>
+        {campuses.length>1&&(
+          <Fld label="Campus">
+            <select value={form.campus} onChange={e=>sf("campus")(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,background:W,color:TX,outline:"none"}}>
+              {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Fld>
+        )}
+
         {/* ── SECTION 2: Member or Visitor Status ── */}
         {pType==="member"?(
           <>
@@ -10454,7 +10477,7 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
         <SH label="Emergency Contact" icon="🚨"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
           <Fld label="Contact Name"><Inp value={form.emergencyName} onChange={sf("emergencyName")} placeholder="Full name"/></Fld>
-          <Fld label="Contact Phone"><Inp value={form.emergencyPhone} onChange={v=>sf("emergencyPhone")(fmtPhone(v))} placeholder="(602) 555-…"/></Fld>
+          <Fld label="Contact Phone"><Inp value={form.emergencyPhone} onChange={sf("emergencyPhone")} placeholder="(602) 555-…"/></Fld>
           <Fld label="Relationship"><Inp value={form.emergencyRelation} onChange={sf("emergencyRelation")} placeholder="Spouse, Parent…"/></Fld>
         </div>
 
@@ -11588,14 +11611,11 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const [users,setUsers] = useState(()=>{ const saved=lsGet('users'); return (saved&&saved.length)?saved:[{id:1,memberId:5,roleId:"role_admin",password:"pastor2026",pin:"1234",status:"Active",superAdmin:true,overrides:{}}]; });
   const [roles,setRoles] = useState(()=>{
     const saved = lsGet('roles');
-    const base = (!saved || saved.length===0) ? SEED_ROLES : (()=>{
-      const savedIds = new Set(saved.map((r:any)=>r.id));
-      const newOnes = SEED_ROLES.filter(r=>!savedIds.has(r.id));
-      return [...saved, ...newOnes];
-    })();
-    // Repair duplicate IDs
-    const seen=new Set(); let next=500;
-    return base.map((r:any)=>{ if(seen.has(r.id)){const newId="role_"+(next++);return {...r,id:newId};} seen.add(r.id); return r; });
+    if(!saved || saved.length===0) return SEED_ROLES;
+    // Merge any new SEED_ROLES not already in saved list
+    const savedIds = new Set(saved.map((r:any)=>r.id));
+    const newOnes = SEED_ROLES.filter(r=>!savedIds.has(r.id));
+    return [...saved, ...newOnes];
   });
   const [permissions,setPermissions] = useState(()=>{
     const saved = lsGet('permissions');
@@ -11632,9 +11652,6 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     : currentUser?.superAdmin
       ? true
       : checkPermission(currentUser, roles, permissions, 'addvisitor', 'create');
-  const canChatAI = !isStaff || currentUser?.superAdmin || checkPermission(currentUser, roles, permissions, 'ai', 'create');
-  const canExecuteAI = !isStaff || currentUser?.superAdmin || checkPermission(currentUser, roles, permissions, 'ai', 'edit');
-  const canManageAI = !isStaff || currentUser?.superAdmin || checkPermission(currentUser, roles, permissions, 'ai', 'delete');
 
   // Member Portal: email/password login whose email matches a member record but is not in the staff users list
   const _matchMemberByName = (list:any[]) => displayName
@@ -11662,9 +11679,9 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         setChurchSettings(parsed);
       } else {
         if(churchName){setChurchSettings((s:any)=>({...s,name:churchName}));}
-        if(!isStaff&&!window.__NTCC_INIT__?.churchSettings){setShowSetup(true);}
+        if(!window.__NTCC_INIT__?.churchSettings){setShowSetup(true);}
       }
-    }catch(e){if(!isStaff&&!window.__NTCC_INIT__?.churchSettings){setShowSetup(true);}}
+    }catch(e){if(!window.__NTCC_INIT__?.churchSettings){setShowSetup(true);}}
   },[]);
   useEffect(()=>{
     if(!churchSettings.name) return;
@@ -11721,6 +11738,10 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   useEffect(()=>{lsSave('attendance',attendance);},[JSON.stringify(attendance)]);
   useEffect(()=>{lsSave('giving',giving);},[JSON.stringify(giving)]);
   useEffect(()=>{lsSave('prayers',prayers);},[JSON.stringify(prayers)]);
+  const [campuses,setCampuses] = useState(()=>lsGet('campuses')??ICAMPUSES);
+  const [activeCampusId,setActiveCampusId] = useState(()=>lsGet('activeCampusId')??'all');
+  useEffect(()=>{lsSave('campuses',campuses);},[JSON.stringify(campuses)]);
+  useEffect(()=>{lsSave('activeCampusId',activeCampusId);},[activeCampusId]);
   useEffect(()=>{lsSave('groups',groups);},[JSON.stringify(groups)]);
   useEffect(()=>{lsSave('grpMeetings',grpMeetings);},[JSON.stringify(grpMeetings)]);
   useEffect(()=>{lsSave('visitRecords',visitRecords);},[JSON.stringify(visitRecords)]);
@@ -11803,19 +11824,12 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       if(Array.isArray(d.progressNotes)&&d.progressNotes.length) setProgressNotes(d.progressNotes);
       if(Array.isArray(d.teacherSchedule)&&d.teacherSchedule.length) setTeacherSchedule(d.teacherSchedule);
       if(Array.isArray(d.kidsCheckIns)&&d.kidsCheckIns.length) setKidsCheckIns(d.kidsCheckIns);
-      if(Array.isArray(d.roles)&&d.roles.length){
-        // Repair duplicate role IDs caused by useRef(400) resetting across remounts
-        const seen=new Set(); let next=500;
-        const fixed=d.roles.map((r:any)=>{
-          if(seen.has(r.id)){const newId="role_"+(next++);return {...r,id:newId};}  
-          seen.add(r.id); return r;
-        });
-        setRoles(fixed);
-      }
+      if(Array.isArray(d.roles)&&d.roles.length) setRoles(d.roles);
       if(d.permissions&&Object.keys(d.permissions).length) setPermissions(d.permissions);
       if(Array.isArray(d.users)&&d.users.length) setUsers(d.users);
       if(Array.isArray(d.prospects)) setProspects(d.prospects); // trust empty array — removal on another device must propagate
       if(d.churchSettings?.name){setChurchSettings(d.churchSettings);try{localStorage.setItem(LS('church_settings'),JSON.stringify(d.churchSettings));}catch(e){}}
+      if(Array.isArray(d.campuses)&&d.campuses.length) setCampuses(d.campuses);
       lastSyncAt.current = Date.now();
       // Suppress the next auto-save triggered by these state changes — we just loaded from cloud,
       // no need to immediately write back what we just read
@@ -11866,7 +11880,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const blob = {members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects};
+        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -11878,7 +11892,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   },[JSON.stringify({members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
     children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
     emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects})]);
+    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses})]);
 
   const nidEmail = useRef(8000);
   const logEmail = (data) => {
@@ -11962,11 +11976,11 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     visitation:"visitation", groups:"groups", education:"education",
     maintenance:"maintenance", calendar:"events", attendance:"attendance",
     giving:"giving", prayer:"prayer", email:null, sms:null,
-    access:"settings", ai:"ai", settings:"settings", alerts:null, manual:null,
+    access:"settings", ai:null, settings:"settings", alerts:null, manual:null,
   };
   // For staff, hide nav items they don't have "view" permission for
   // Additionally, restricted staff (non-Admin/non-SuperAdmin) always have maintenance/ai/email/sms hidden
-  const RESTRICTED_NAV_HIDDEN = ['email','sms'];
+  const RESTRICTED_NAV_HIDDEN = ['ai','email','sms'];
   const PORTAL_NAV = [
     {id:"myprofile",label:"My Profile",icon:"👤"},
     {id:"prayer",label:"Prayer Wall",icon:"Pr"},
@@ -12052,7 +12066,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             <div style={{color:G,fontSize:11}}>{cr?cr.name:"Staff Member"}</div>
           </>);
         })() : (<>
-          <div style={{color:"#fff",fontSize:12,fontWeight:500}}>{(adminFirst||adminLast)?[adminFirst,adminLast].filter(Boolean).join(' '):churchSettings.pastorName}</div>
+          <div style={{color:"#fff",fontSize:12,fontWeight:500}}>{churchSettings.pastorName}</div>
           <div style={{color:G,fontSize:11}}>Super Administrator</div>
         </>)}
         <div style={{display:"flex",alignItems:"center",gap:5,marginTop:6}}>
@@ -12131,6 +12145,15 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             {cloudSync==='error' && <div style={{fontSize:11,color:RE,display:"flex",alignItems:"center",gap:4}}>⚠ Sync error</div>}
             {!isStaff && <button onClick={()=>{setView("ai");setNavOpen(false);}} style={{background:GL,border:"1px solid "+G,borderRadius:8,padding:isMobile?"7px 10px":"7px 12px",cursor:"pointer",fontSize:12,fontWeight:500,color:"#7a5c10",whiteSpace:"nowrap"}}>AI</button>}
 
+            {/* � Campus Selector */}
+            {!isStaff && campuses.length>1 && (
+              <select value={activeCampusId} onChange={e=>setActiveCampusId(e.target.value)}
+                title="Active Campus" style={{padding:"6px 10px",border:"0.5px solid "+BR,borderRadius:8,background:W,fontSize:12,fontWeight:500,color:N,cursor:"pointer",maxWidth:isMobile?140:180,outline:"none"}}>
+                <option value="all">🏛 All</option>
+                {campuses.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+
             {/* �🎨 Theme Picker */}
             <div style={{position:"relative"}}>
               <button onClick={()=>setShowThemePicker(p=>!p)} title="Change Theme" style={{background:W,border:"0.5px solid "+BR,borderRadius:8,padding:isMobile?"7px 10px":"7px 12px",cursor:"pointer",fontSize:14,lineHeight:1,flexShrink:0}}>🎨</button>
@@ -12164,7 +12187,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         {/* Page content */}
         <div style={{flex:1,padding:isMobile?12:24,overflow:"auto"}}>
           {showSetup && <SetupModal onSave={s=>{setChurchSettings(s);setShowSetup(false);}} initialName={churchName||''} initialPastorName={(adminFirst||adminLast)?`Pastor ${[adminFirst,adminLast].filter(Boolean).join(' ')}`:''}/>}
-          {!isMemberPortal && view==="settings" && <ChurchSettingsPage cs={churchSettings} setCs={setChurchSettings} churchId={churchId} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} prayers={prayers} groups={groups} grpMeetings={grpMeetings} visitRecords={visitRecords} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} pledgeDrives={pledgeDrives} pledges={pledges} weeklyReports={weeklyReports} equipment={equipment} workOrders={workOrders} schedMaint={schedMaint}
+          {!isMemberPortal && view==="settings" && <ChurchSettingsPage cs={churchSettings} setCs={setChurchSettings} churchId={churchId} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} prayers={prayers} groups={groups} grpMeetings={grpMeetings} visitRecords={visitRecords} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} pledgeDrives={pledgeDrives} pledges={pledges} weeklyReports={weeklyReports} equipment={equipment} workOrders={workOrders} schedMaint={schedMaint} campuses={campuses} setCampuses={setCampuses}
             backupData={{members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,checkIns,kidsCheckIns,children,pledgeDrives,pledges,weeklyReports,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,users,roles,permissions,recurring,custom,emailLog,emailTemplates,emailConfig,incidents,rollCalls,progressNotes,teacherSchedule,churchSettings}}
             onRestore={(d:any,mode:string)=>{
               const s=(setter:any,key:string,isArr=true)=>{if(d[key]===undefined)return;if(mode==='replace'){setter(d[key]);}else{if(isArr&&Array.isArray(d[key])){setter((cur:any[])=>[...cur,...d[key].filter((n:any)=>!cur.find(x=>String(x.id)===String(n.id)))]);}else{setter(d[key]);}}};
@@ -12172,8 +12195,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             }}
           />}
           {!isMemberPortal && view==="dashboard" && <Dashboard members={members} visitors={visitors} attendance={attendance} giving={giving} prayers={prayers} setView={setView} canViewGiving={canViewGiving} isRestrictedUser={isRestrictedUser} canAddPerson={canAddPerson}/>}
-          {!isMemberPortal && view==="addperson" && <AddMemberPage members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} currentUser={currentUser} roles={roles} permissions={permissions} setView={setView} prospects={prospects} setProspects={setProspects} children={children} setChildren={setChildren}/>}
-          {!isMemberPortal && view==="people" && <People members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} setGiving={setGiving} prayers={prayers} setPrayers={setPrayers} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} visitRecords={visitRecords} setVisitRecords={setVisitRecords} checkIns={checkIns} setCheckIns={setCheckIns} setView={setView} canViewGiving={canViewGiving} currentUser={currentUser} roles={roles} children={children} setChildren={setChildren}/>}
+          {!isMemberPortal && view==="addperson" && <AddMemberPage members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} currentUser={currentUser} roles={roles} permissions={permissions} setView={setView} prospects={prospects} setProspects={setProspects} children={children} setChildren={setChildren} campuses={campuses}/>}
+          {!isMemberPortal && view==="people" && <People members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} giving={giving} setGiving={setGiving} prayers={prayers} setPrayers={setPrayers} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} visitRecords={visitRecords} setVisitRecords={setVisitRecords} checkIns={checkIns} setCheckIns={setCheckIns} setView={setView} canViewGiving={canViewGiving} currentUser={currentUser} roles={roles} children={children} setChildren={setChildren} campuses={campuses} activeCampusId={activeCampusId}/>}
           {!isMemberPortal && view==="groups" && <Groups members={members} groups={groups} setGroups={setGroups} grpMeetings={grpMeetings} setGrpMeetings={setGrpMeetings} currentUser={currentUser} roles={roles}/>}
           {!isMemberPortal && view==="education" && <Education members={members} setMembers={setMembers} visitors={visitors} users={users} roles={roles} children={children} setChildren={setChildren} classrooms={classrooms} setClassrooms={setClassrooms} teacherSchedule={teacherSchedule} setTeacherSchedule={setTeacherSchedule} kidsCheckIns={kidsCheckIns} setKidsCheckIns={setKidsCheckIns} checkIns={checkIns} incidents={incidents} setIncidents={setIncidents} rollCalls={rollCalls} setRollCalls={setRollCalls} progressNotes={progressNotes} setProgressNotes={setProgressNotes} cs={churchSettings} printerConfig={printerConfig} setPrinterConfig={setPrinterConfig}/>}
           {!isMemberPortal && view==="maintenance" && <Maintenance users={users} members={members} currentUser={currentUser} roles={roles} permissions={permissions} equipment={equipment} setEquipment={setEquipment} workOrders={workOrders} setWorkOrders={setWorkOrders} schedMaint={schedMaint} setSchedMaint={setSchedMaint} supplies={supplies} setSupplies={setSupplies} checkoutItems={checkoutItems} setCheckoutItems={setCheckoutItems} checkouts={checkouts} setCheckouts={setCheckouts}/>}
@@ -12201,8 +12224,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           )}
           {!isMemberPortal && view==="prospects" && <ProspectsPage prospects={prospects} setProspects={setProspects} members={members}/>}
           {!isMemberPortal && view==="visitation" && <Visitation visitors={visitors} setVisitors={setVisitors} members={members} setMembers={setMembers} users={users} currentUser={currentUser} roles={roles} visitRecords={visitRecords} setVisitRecords={setVisitRecords} setView={setView} canAddVisitor={canAddVisitor}/>}
-          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView}/>}
-          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles}/>}
+          {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView} activeCampusId={activeCampusId} campuses={campuses}/>}
+          {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles} activeCampusId={activeCampusId} campuses={campuses}/>}
           {!isMemberPortal && view==="prayer" && <Prayer prayers={prayers} setPrayers={setPrayers}/>}
           {/* ── Member Portal hard-gate: only myprofile and prayer allowed ── */}
           {isMemberPortal && view!=="prayer" && <MemberProfilePortal member={portalMember} setMembers={setMembers} giving={giving} onSignOut={onSignOut} roles={roles} users={users} setUsers={setUsers}/>}
@@ -12213,7 +12236,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="sms" && <SmsCenter smsLog={smsLog} setSmsLog={setSmsLog} smsTemplates={smsTemplates} setSmsTemplates={setSmsTemplates} smsConfig={smsConfig} setSmsConfig={setSmsConfig} members={members} visitors={visitors} cs={churchSettings} onCompose={()=>openSmsComposer({})} onBulkCompose={()=>openBulkSmsComposer({recipients:[...members,...visitors].filter(p=>p.phone).map(p=>({...p,first:p.first,last:p.last,name:p.first+" "+p.last}))})}/>}
           {!isMemberPortal && view==="email" && <EmailCenter emailLog={emailLog} setEmailLog={setEmailLog} emailTemplates={emailTemplates} setEmailTemplates={setEmailTemplates} emailConfig={emailConfig} setEmailConfig={setEmailConfig} members={members} visitors={visitors} cs={churchSettings} onCompose={()=>openEmailComposer({})} onBulkCompose={()=>openBulkEmailComposer({recipients:members.filter(m=>m.email).map(m=>({name:m.first+" "+m.last,first:m.first,last:m.last,email:m.email}))})}/>}
           {!isMemberPortal && view==="access" && <Access members={members} users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} permissions={permissions} setPermissions={setPermissions} portalMembers={portalMembers} setPortalMembers={setPortalMembers} currentUser={currentUser} churchId={churchId}/>}
-          {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile} visitRecords={visitRecords} setVisitRecords={setVisitRecords} users={users} canChat={canChatAI} canExecute={canExecuteAI} canManageSettings={canManageAI}/>}
+          {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile}/>}
           {!isMemberPortal && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords}/>}
           {!isMemberPortal && view==="manual" && <ManualPage/>}
         </div>
