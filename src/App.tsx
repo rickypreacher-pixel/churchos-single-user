@@ -5696,6 +5696,7 @@ function ProspectsPage({prospects,setProspects,members}:any) {
   const [invSug,setInvSug] = useState<any[]>([]);
   const nid = useRef(7000);
   const sf = (k:string) => (v:any) => setForm((f:any)=>({...f,[k]:v}));
+  const fmtPhone=(v:string)=>{const d=v.replace(/\D/g,'').slice(0,10);if(d.length<=3)return d;if(d.length<=6)return`(${d.slice(0,3)}) ${d.slice(3)}`;return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;};
 
   const openAdd = () => { setEditing(null); setForm(blank()); setInvSug([]); setModal(true); };
   const openEdit = (p:any) => {
@@ -5814,7 +5815,7 @@ function ProspectsPage({prospects,setProspects,members}:any) {
           <Fld label="First Name *"><Inp value={form.first} onChange={sf("first")} placeholder="First"/></Fld>
           <Fld label="Last Name"><Inp value={form.last} onChange={sf("last")} placeholder="Last"/></Fld>
         </div>
-        <Fld label="Phone *"><Inp value={form.phone} onChange={sf("phone")} placeholder="(555) 000-0000"/></Fld>
+        <Fld label="Phone *"><Inp value={form.phone} onChange={v=>sf("phone")(fmtPhone(v))} placeholder="(555) 000-0000"/></Fld>
 
         <div style={{fontSize:11,color:MU,fontWeight:600,marginBottom:6,marginTop:4,textTransform:"uppercase",letterSpacing:0.4}}>Address</div>
         <Fld label="Street"><Inp value={form.street} onChange={sf("street")} placeholder="123 Main St"/></Fld>
