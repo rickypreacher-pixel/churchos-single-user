@@ -1823,6 +1823,7 @@ const ini=(f,l)=>(((f||"")[0]||"")+((l||"")[0]||"")).toUpperCase();
 const f$=n=>"$"+Number(n).toLocaleString();
 const fd=d=>d?new Date(d+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—";
 const td=()=>new Date().toISOString().split("T")[0];
+const SERVICE_ROLES_LIST = ["Usher","Greeter","Sound/Media","Offering Counter","Parking","Welcome Desk","Nursery","Security","Praise Team","Other"];
 const albl=a=>({view:"View",create:"Create",edit:"Edit",delete:"Delete"}[a]||a);
 const actionColor=a=>({view:BL,create:GR,edit:"#d97706",delete:RE}[a]||MU);
 
@@ -5716,6 +5717,846 @@ const PROSPECT_STATUSES = [
   {id:"No Response",  label:"No Response",    color:"#d97706"},
   {id:"Confirmed",    label:"Confirmed Coming",color:"#16a34a"},
 ];
+
+// ═══════════════════════════════════════════════════════════════
+// VOLUNTEER & USHER SCHEDULER
+// ═══════════════════════════════════════════════════════════════
+function VolunteerScheduler({members,volunteerSlots,setVolunteerSlots}:any) {
+  const blank = ()=>({date:td(),service:"Sunday Morning Worship",role:"Usher",memberId:"",notes:""});
+  const [modal,setModal] = useState(false);
+  const [form,setForm] = useState<any>(blank());
+  const [editing,setEditing] = useState<any>(null);
+  const [filterDate,setFilterDate] = useState("");
+  const [filterRole,setFilterRole] = useState("All");
+  const [search,setSearch] = useState("");
+  const [tab,setTab] = useState("upcoming");
+  const nid = useRef(9500);
+  const sf = (k:string) => (v:any) => setForm((f:any)=>({...f,[k]:v}));
+  const activeMembers = members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last));
+  const today = td();
+  const save = () => {
+    if(!form.memberId||!form.date||!form.role){alert("Date, role, and member required.");return;}
+    const rec = {date:form.date,service:form.service,role:form.role,memberId:+form.memberId,notes:form.notes};
+    if(editing){setVolunteerSlots((s:any[])=>s.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setVolunteerSlots((s:any[])=>[{...rec,id:nid.current++},...s]);}
+    setModal(false); setEditing(null); setForm(blank());
+  };
+  const del = (id:number) => {if(confirm("Remove this slot?"))setVolunteerSlots((s:any[])=>s.filter(x=>x.id!==id));};
+  const openEdit = (s:any) => {setEditing(s);setForm({date:s.date,service:s.service,role:s.role,memberId:String(s.memberId),notes:s.notes||""});setModal(true);};
+  const getName = (mid:number) => {const m=members.find((x:any)=>x.id===mid);return m?m.first+" "+m.last:"Unknown";};
+  const getPhone = (mid:number) => {const m=members.find((x:any)=>x.id===mid);return m?.phone||"";};
+
+  let shown = [...volunteerSlots].sort((a:any,b:any)=>a.date.localeCompare(b.date));
+  if(tab==="upcoming") shown=shown.filter(s=>s.date>=today);
+  if(tab==="past") shown=shown.filter(s=>s.date<today);
+  if(filterDate) shown=shown.filter(s=>s.date===filterDate);
+  if(filterRole!=="All") shown=shown.filter(s=>s.role===filterRole);
+  if(search) shown=shown.filter(s=>getName(s.memberId).toLowerCase().includes(search.toLowerCase())||s.role.toLowerCase().includes(search.toLowerCase()));
+
+  const memberStats:{[k:number]:number}={};
+  volunteerSlots.forEach((s:any)=>{memberStats[s.memberId]=(memberStats[s.memberId]||0)+1;});
+  const topVolunteers = Object.entries(memberStats).sort((a:any,b:any)=>b[1]-a[1]).slice(0,5).map(([mid,count])=>({name:getName(+mid),count}));
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <Stat label="Total Slots" value={volunteerSlots.length} color={N}/>
+        <Stat label="Upcoming" value={volunteerSlots.filter((s:any)=>s.date>=today).length} color={GR}/>
+        <Stat label="Past" value={volunteerSlots.filter((s:any)=>s.date<today).length} color={MU}/>
+        <Stat label="Volunteers" value={new Set(volunteerSlots.map((s:any)=>s.memberId)).size} color={BL}/>
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:14,background:W,borderRadius:8,border:"0.5px solid "+BR,padding:3,width:"fit-content"}}>
+        {[["upcoming","Upcoming"],["past","Past"],["all","All"],["stats","Top Volunteers"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{padding:"6px 14px",border:"none",borderRadius:6,background:tab===id?N:"transparent",color:tab===id?"#fff":TX,fontSize:12,fontWeight:tab===id?500:400,cursor:"pointer"}}>{label}</button>
+        ))}
+      </div>
+      {tab==="stats"?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:18}}>
+          <div style={{fontSize:14,fontWeight:500,color:N,marginBottom:14}}>Most Active Volunteers</div>
+          {topVolunteers.length===0?<p style={{color:MU,fontStyle:"italic"}}>No data yet.</p>:topVolunteers.map((v:any,i:number)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"0.5px solid "+BR}}>
+              <span style={{fontSize:13,fontWeight:500}}>{i+1}. {v.name}</span>
+              <span style={{fontSize:13,color:GR,fontWeight:600}}>{v.count} assignment{v.count!==1?"s":""}</span>
+            </div>
+          ))}
+        </div>
+      ):(
+        <>
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or role..." style={{padding:"8px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",minWidth:180}}/>
+              <input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}/>
+              <select value={filterRole} onChange={e=>setFilterRole(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+                <option value="All">All Roles</option>
+                {SERVICE_ROLES_LIST.map(r=><option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ Add Slot</Btn>
+          </div>
+          {shown.length===0?(
+            <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No volunteer slots found. Click + Add Slot to schedule someone.</div>
+          ):(
+            <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,overflow:"hidden"}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr style={{background:"#f8f9fc"}}>{["Date","Service","Role","Member","Phone","Notes",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:MU,textTransform:"uppercase",letterSpacing:0.5,borderBottom:"0.5px solid "+BR}}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {shown.map((s:any)=>(
+                    <tr key={s.id} style={{borderBottom:"0.5px solid "+BR}}>
+                      <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{fd(s.date)}</td>
+                      <td style={{padding:"10px 14px",fontSize:12,color:MU}}>{s.service}</td>
+                      <td style={{padding:"10px 14px"}}><span style={{background:N+"15",color:N,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:500}}>{s.role}</span></td>
+                      <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{getName(s.memberId)}</td>
+                      <td style={{padding:"10px 14px",fontSize:12,color:BL}}>{getPhone(s.memberId)?<a href={"tel:"+getPhone(s.memberId)} style={{color:BL,textDecoration:"none"}}>{getPhone(s.memberId)}</a>:"—"}</td>
+                      <td style={{padding:"10px 14px",fontSize:12,color:MU}}>{s.notes||"—"}</td>
+                      <td style={{padding:"10px 14px"}}>
+                        <div style={{display:"flex",gap:5}}>
+                          <Btn onClick={()=>openEdit(s)} v="ghost" style={{fontSize:11,padding:"3px 8px"}}>Edit</Btn>
+                          <Btn onClick={()=>del(s.id)} v="danger" style={{fontSize:11,padding:"3px 8px"}}>✕</Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());}} title={editing?"Edit Slot":"Add Volunteer Slot"} width={480}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <Fld label="Date"><Inp type="date" value={form.date} onChange={sf("date")}/></Fld>
+          <Fld label="Role">
+            <select value={form.role} onChange={e=>sf("role")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {SERVICE_ROLES_LIST.map(r=><option key={r}>{r}</option>)}
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Service">
+          <select value={form.service} onChange={e=>sf("service")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            {["Sunday Morning Worship","Education Department","Sunday Night Service","Tuesday Bible Study","Thursday Worship","Special Event"].map(s=><option key={s}>{s}</option>)}
+          </select>
+        </Fld>
+        <Fld label="Member">
+          <select value={form.memberId} onChange={e=>sf("memberId")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="">— Select Member —</option>
+            {activeMembers.map((m:any)=><option key={m.id} value={m.id}>{m.last}, {m.first}</option>)}
+          </select>
+        </Fld>
+        <Fld label="Notes"><Inp value={form.notes} onChange={sf("notes")} placeholder="Optional notes"/></Fld>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Add Slot"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLASSES & LEADERSHIP TRAINING TRACKER
+// ═══════════════════════════════════════════════════════════════
+const CLASS_TYPES = ["New Member Class","Leadership Class","Bible Study Course","Baptism Prep","Discipleship","Outreach Training","Youth Leader Training","Other"];
+const CLASS_STATUSES = ["Enrolled","In Progress","Completed","Dropped"];
+function ClassesTracker({members,classEnrollments,setClassEnrollments}:any) {
+  const blank = ()=>({memberId:"",className:"New Member Class",startDate:td(),completedDate:"",status:"Enrolled",sessions:0,notes:""});
+  const [modal,setModal] = useState(false);
+  const [form,setForm] = useState<any>(blank());
+  const [editing,setEditing] = useState<any>(null);
+  const [filterClass,setFilterClass] = useState("All");
+  const [filterStatus,setFilterStatus] = useState("All");
+  const [search,setSearch] = useState("");
+  const nid = useRef(9600);
+  const sf = (k:string) => (v:any) => setForm((f:any)=>({...f,[k]:v}));
+  const getName = (mid:number) => {const m=members.find((x:any)=>x.id===mid);return m?m.first+" "+m.last:"Unknown";};
+  const activeMembers = members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last));
+  const save = () => {
+    if(!form.memberId||!form.className){alert("Member and class name required.");return;}
+    const rec = {memberId:+form.memberId,className:form.className,startDate:form.startDate,completedDate:form.completedDate,status:form.status,sessions:+form.sessions||0,notes:form.notes};
+    if(editing){setClassEnrollments((e:any[])=>e.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setClassEnrollments((e:any[])=>[{...rec,id:nid.current++},...e]);}
+    setModal(false); setEditing(null); setForm(blank());
+  };
+  const del = (id:number) => {if(confirm("Remove enrollment?"))setClassEnrollments((e:any[])=>e.filter(x=>x.id!==id));};
+  const openEdit = (e:any) => {setEditing(e);setForm({memberId:String(e.memberId),className:e.className,startDate:e.startDate,completedDate:e.completedDate||"",status:e.status,sessions:String(e.sessions||0),notes:e.notes||""});setModal(true);};
+
+  const STATUS_COLORS:any={Enrolled:BL,InProgress:AM,"In Progress":AM,Completed:GR,Dropped:MU};
+  let shown = [...classEnrollments].sort((a:any,b:any)=>b.startDate.localeCompare(a.startDate));
+  if(filterClass!=="All") shown=shown.filter(e=>e.className===filterClass);
+  if(filterStatus!=="All") shown=shown.filter(e=>e.status===filterStatus);
+  if(search) shown=shown.filter(e=>getName(e.memberId).toLowerCase().includes(search.toLowerCase())||e.className.toLowerCase().includes(search.toLowerCase()));
+
+  const byClass:{[k:string]:{total:number;completed:number}}={};
+  classEnrollments.forEach((e:any)=>{if(!byClass[e.className])byClass[e.className]={total:0,completed:0};byClass[e.className].total++;if(e.status==="Completed")byClass[e.className].completed++;});
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <Stat label="Total Enrollments" value={classEnrollments.length} color={N}/>
+        <Stat label="Completed" value={classEnrollments.filter((e:any)=>e.status==="Completed").length} color={GR}/>
+        <Stat label="In Progress" value={classEnrollments.filter((e:any)=>["Enrolled","In Progress"].includes(e.status)).length} color={AM}/>
+        <Stat label="Classes" value={new Set(classEnrollments.map((e:any)=>e.className)).size} color={BL}/>
+      </div>
+      {Object.keys(byClass).length>0&&(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:500,color:N,marginBottom:10}}>Class Summary</div>
+          {Object.entries(byClass).map(([cls,d]:any)=>{
+            const pct=d.total?Math.round(d.completed/d.total*100):0;
+            return(<div key={cls} style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{fontWeight:500}}>{cls}</span><span style={{color:GR}}>{d.completed}/{d.total} graduated ({pct}%)</span></div>
+              <div style={{height:5,background:BG,borderRadius:3,overflow:"hidden"}}><div style={{width:pct+"%",height:"100%",background:GR}}/></div>
+            </div>);
+          })}
+        </div>
+      )}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or class..." style={{padding:"8px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",minWidth:180}}/>
+          <select value={filterClass} onChange={e=>setFilterClass(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Classes</option>
+            {CLASS_TYPES.map(c=><option key={c}>{c}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Statuses</option>
+            {CLASS_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ Enroll Member</Btn>
+      </div>
+      {shown.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No enrollments yet. Click + Enroll Member to get started.</div>
+      ):(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,overflow:"hidden"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr style={{background:"#f8f9fc"}}>{["Member","Class","Started","Status","Sessions","Notes",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:MU,textTransform:"uppercase",letterSpacing:0.5,borderBottom:"0.5px solid "+BR}}>{h}</th>)}</tr></thead>
+            <tbody>
+              {shown.map((e:any)=>{
+                const sc=STATUS_COLORS[e.status]||MU;
+                return(<tr key={e.id} style={{borderBottom:"0.5px solid "+BR}}>
+                  <td style={{padding:"10px 14px",fontSize:13,fontWeight:500}}>{getName(e.memberId)}</td>
+                  <td style={{padding:"10px 14px",fontSize:13}}>{e.className}</td>
+                  <td style={{padding:"10px 14px",fontSize:12,color:MU}}>{e.startDate?fd(e.startDate):"—"}</td>
+                  <td style={{padding:"10px 14px"}}><span style={{background:sc+"18",color:sc,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:500}}>{e.status}</span></td>
+                  <td style={{padding:"10px 14px",fontSize:13,fontWeight:500,color:N}}>{e.sessions||0}</td>
+                  <td style={{padding:"10px 14px",fontSize:12,color:MU}}>{e.notes||"—"}</td>
+                  <td style={{padding:"10px 14px"}}>
+                    <div style={{display:"flex",gap:5}}>
+                      <Btn onClick={()=>openEdit(e)} v="ghost" style={{fontSize:11,padding:"3px 8px"}}>Edit</Btn>
+                      <Btn onClick={()=>del(e.id)} v="danger" style={{fontSize:11,padding:"3px 8px"}}>✕</Btn>
+                    </div>
+                  </td>
+                </tr>);
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());}} title={editing?"Edit Enrollment":"Enroll Member"} width={480}>
+        <Fld label="Member">
+          <select value={form.memberId} onChange={e=>sf("memberId")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="">— Select Member —</option>
+            {activeMembers.map((m:any)=><option key={m.id} value={m.id}>{m.last}, {m.first}</option>)}
+          </select>
+        </Fld>
+        <Fld label="Class">
+          <select value={form.className} onChange={e=>sf("className")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            {CLASS_TYPES.map(c=><option key={c}>{c}</option>)}
+          </select>
+        </Fld>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Start Date"><Inp type="date" value={form.startDate} onChange={sf("startDate")}/></Fld>
+          <Fld label="Sessions Attended"><Inp type="number" value={form.sessions} onChange={sf("sessions")} placeholder="0"/></Fld>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Status">
+            <select value={form.status} onChange={e=>sf("status")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {CLASS_STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Completion Date (optional)"><Inp type="date" value={form.completedDate} onChange={sf("completedDate")}/></Fld>
+        </div>
+        <Fld label="Notes"><textarea value={form.notes} onChange={e=>sf("notes")(e.target.value)} rows={2} placeholder="Any notes..." style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/></Fld>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Enroll"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOSPITAL & SICK VISIT LOG
+// ═══════════════════════════════════════════════════════════════
+const VISIT_TYPES = ["Hospital Visit","Home Visit","Nursing Home","Rehab Center","Phone Call","Prayer Visit","Other"];
+const VISIT_STATUSES = ["Scheduled","Visited","Needs Follow-Up","Resolved"];
+const PHOENIX_HOSPITALS = [
+  "Banner University Medical Center – Phoenix",
+  "Banner Desert Medical Center – Mesa",
+  "Banner Gateway Medical Center – Gilbert",
+  "Banner Thunderbird Medical Center – Glendale",
+  "Banner Del Webb Medical Center – Sun City West",
+  "St. Joseph's Hospital & Medical Center – Phoenix",
+  "Chandler Regional Medical Center – Chandler",
+  "Mercy Gilbert Medical Center – Gilbert",
+  "HonorHealth John C. Lincoln Medical Center – Phoenix",
+  "HonorHealth Scottsdale Osborn Medical Center – Scottsdale",
+  "HonorHealth Scottsdale Shea Medical Center – Scottsdale",
+  "HonorHealth Scottsdale Thompson Peak Medical Center – Scottsdale",
+  "Mayo Clinic Hospital – Phoenix",
+  "Phoenix Children's Hospital – Phoenix",
+  "Valleywise Health Medical Center – Phoenix",
+  "Mountain Vista Medical Center – Mesa",
+  "Abrazo Arizona Heart Hospital – Phoenix",
+  "Abrazo Central Campus – Phoenix",
+  "Abrazo West Campus – Goodyear",
+  "West Valley Hospital – Goodyear",
+  "Oasis Hospital – Phoenix",
+  "Other",
+];
+function SickVisitLog({members,visitors,sickVisits,setSickVisits,users=[]}:any) {
+  const blank = ()=>({personId:"",personType:"member",assignedDate:td(),visitDate:"",visitType:"Hospital Visit",facilityPreset:"",facility:"",visitedBy:"",status:"Scheduled",notes:"",nextFollowUp:""});
+  const [modal,setModal] = useState(false);
+  const [form,setForm] = useState<any>(blank());
+  const [editing,setEditing] = useState<any>(null);
+  const [filterStatus,setFilterStatus] = useState("All");
+  const [search,setSearch] = useState("");
+  const [formError,setFormError] = useState("");
+  const nid = useRef(9700);
+  const sf = (k:string) => (v:any) => {setFormError("");setForm((f:any)=>({...f,[k]:v}));};
+  const getPerson = (id:number,type:string) => type==="member"?members.find((m:any)=>m.id===id):visitors.find((v:any)=>v.id===id);
+  const getPersonName = (id:number,type:string) => {const p=getPerson(id,type);return p?p.first+" "+p.last:"Unknown";};
+  const save = () => {
+    if(!form.personId){setFormError("Please select a person.");return;}
+    const rec={personId:+form.personId,personType:form.personType,assignedDate:form.assignedDate,visitDate:form.visitDate,visitType:form.visitType,facility:form.facility,visitedBy:form.visitedBy,status:form.status,notes:form.notes,nextFollowUp:form.nextFollowUp};
+    if(editing){setSickVisits((s:any[])=>s.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setSickVisits((s:any[])=>[{...rec,id:nid.current++},...s]);}
+    setModal(false); setEditing(null); setForm(blank());
+  };
+  const del = (id:number)=>{if(confirm("Delete this visit record?"))setSickVisits((s:any[])=>s.filter(x=>x.id!==id));};
+  const openEdit=(v:any)=>{setEditing(v);const fp=v.facility&&PHOENIX_HOSPITALS.includes(v.facility)?v.facility:v.facility?"Other":"";setForm({personId:String(v.personId),personType:v.personType,assignedDate:v.assignedDate||v.visitDate||td(),visitDate:v.visitDate||"",visitType:v.visitType,facilityPreset:fp,facility:v.facility||"",visitedBy:v.visitedBy||"",status:v.status,notes:v.notes||"",nextFollowUp:v.nextFollowUp||""});setModal(true);};
+  const SV_COLORS:any={Scheduled:BL,Visited:GR,"Needs Follow-Up":AM,Resolved:MU};
+  let shown=[...sickVisits].sort((a:any,b:any)=>b.visitDate.localeCompare(a.visitDate));
+  if(filterStatus!=="All") shown=shown.filter(s=>s.status===filterStatus);
+  if(search) shown=shown.filter(s=>getPersonName(s.personId,s.personType).toLowerCase().includes(search.toLowerCase())||s.facility.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <Stat label="Total Visits" value={sickVisits.length} color={N}/>
+        <Stat label="Active" value={sickVisits.filter((s:any)=>["Scheduled","Needs Follow-Up"].includes(s.status)).length} color={AM}/>
+        <Stat label="Visited" value={sickVisits.filter((s:any)=>s.status==="Visited").length} color={BL}/>
+        <Stat label="Resolved" value={sickVisits.filter((s:any)=>s.status==="Resolved").length} color={GR}/>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or facility..." style={{padding:"8px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",minWidth:180}}/>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Statuses</option>
+            {VISIT_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ Log Visit</Btn>
+      </div>
+      {shown.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No visit records yet. Click + Log Visit to record one.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {shown.map((v:any)=>{
+            const sc=SV_COLORS[v.status]||MU;
+            const p=getPerson(v.personId,v.personType);
+            return(<div key={v.id} style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"14px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{fontSize:15,fontWeight:600,color:TX}}>{getPersonName(v.personId,v.personType)}</span>
+                    <span style={{fontSize:10,background:v.personType==="member"?"#dcfce7":"#fff3e0",color:v.personType==="member"?GR:AM,borderRadius:20,padding:"2px 8px",fontWeight:500}}>{v.personType}</span>
+                    <span style={{background:sc+"18",color:sc,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:500}}>{v.status}</span>
+                  </div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:MU}}>
+                    {v.assignedDate&&<span>📋 Assigned: {fd(v.assignedDate)}</span>}
+                    {v.visitDate&&<span>✅ Visited: {fd(v.visitDate)}</span>}
+                    {!v.visitDate&&!v.assignedDate&&<span>📅 {fd(v.visitDate||td())}</span>}
+                    <span>🏥 {v.visitType}</span>
+                    {v.facility&&<span>📍 {v.facility}</span>}
+                    {v.visitedBy&&<span>👤 Visited by {v.visitedBy}</span>}
+                    {v.nextFollowUp&&<span style={{color:AM}}>⏰ Follow-up: {fd(v.nextFollowUp)}</span>}
+                  </div>
+                  {v.notes&&<div style={{fontSize:12,color:MU,fontStyle:"italic",marginTop:6}}>💬 {v.notes}</div>}
+                </div>
+                <div style={{display:"flex",gap:5}}>
+                  <Btn onClick={()=>openEdit(v)} v="ghost" style={{fontSize:11,padding:"4px 10px"}}>Edit</Btn>
+                  <Btn onClick={()=>del(v.id)} v="danger" style={{fontSize:11,padding:"4px 8px"}}>✕</Btn>
+                </div>
+              </div>
+            </div>);
+          })}
+        </div>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());setFormError("");}} title={editing?"Edit Visit":"Log Visit"} width={500}>
+        <Fld label="Person">
+          <select value={form.personId} onChange={e=>{const opt=e.target.selectedOptions[0];sf("personId")(e.target.value);sf("personType")(opt?.dataset.type||"member");}} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="">— Select Person —</option>
+            <optgroup label="Members">{members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((m:any)=><option key={m.id} value={m.id} data-type="member">{m.last}, {m.first}</option>)}</optgroup>
+            <optgroup label="Visitors">{visitors.sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((v:any)=><option key={v.id} value={v.id} data-type="visitor">{v.last}, {v.first}</option>)}</optgroup>
+          </select>
+        </Fld>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Date Assigned"><Inp type="date" value={form.assignedDate} onChange={sf("assignedDate")}/></Fld>
+          <Fld label="Actual Date Visited"><Inp type="date" value={form.visitDate} onChange={sf("visitDate")}/></Fld>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Visit Type">
+            <select value={form.visitType} onChange={e=>sf("visitType")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {VISIT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Visited By">
+            <select value={form.visitedBy} onChange={e=>sf("visitedBy")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              <option value="">— Select Staff —</option>
+              {users.filter((u:any)=>u.status==="Active"||u.superAdmin).map((u:any)=>{const m=members.find((mb:any)=>mb.id===u.memberId);const nm=m?m.first+" "+m.last:"User #"+u.id;return<option key={u.id} value={nm}>{nm}</option>;})}
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Facility / Location">
+          <select value={form.facilityPreset} onChange={e=>{const v=e.target.value;sf("facilityPreset")(v);if(v!=="Other")sf("facility")(v);else sf("facility")("");}} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",marginBottom:form.facilityPreset==="Other"?6:0}}>
+            <option value="">— Select Hospital / Location —</option>
+            {PHOENIX_HOSPITALS.map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
+          {form.facilityPreset==="Other"&&<Inp value={form.facility} onChange={sf("facility")} placeholder="Enter facility name..."/>}
+        </Fld>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Status">
+            <select value={form.status} onChange={e=>sf("status")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {VISIT_STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Next Follow-Up (optional)"><Inp type="date" value={form.nextFollowUp} onChange={sf("nextFollowUp")}/></Fld>
+        </div>
+        <Fld label="Notes"><textarea value={form.notes} onChange={e=>sf("notes")(e.target.value)} rows={3} placeholder="Visit details, prayer notes, condition, etc." style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/></Fld>
+        {formError&&<div style={{background:"#fee2e2",border:"0.5px solid #fca5a5",borderRadius:8,padding:"9px 12px",fontSize:12,color:"#dc2626",fontWeight:500,marginTop:4}}>⚠ {formError}</div>}
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Save Visit"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());setFormError("");}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BENEVOLENCE FUND TRACKER
+// ═══════════════════════════════════════════════════════════════
+const BEN_CATEGORIES = ["Food Assistance","Condolence Meal","Rent / Housing","Utility Bill","Medical","Transportation","Clothing","Emergency Cash","Other"];
+const MEAL_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+const blankMealDays = ()=>MEAL_DAYS.map(day=>({day,memberId:"",meal:""}));
+const BEN_STATUSES = ["Pending","Approved","Disbursed","Denied","Withdrawn"];
+function BenevolencePage({members,visitors,benevolence,setBenevolence}:any) {
+  const blank=()=>({personId:"",personType:"member",requestDate:td(),category:"Food Assistance",amountRequested:"",amountApproved:"",disbursedDate:"",status:"Pending",approvedBy:"",notes:"",mealDays:blankMealDays()});
+  const [modal,setModal] = useState(false);
+  const [form,setForm] = useState<any>(blank());
+  const [editing,setEditing] = useState<any>(null);
+  const [filterStatus,setFilterStatus] = useState("All");
+  const [search,setSearch] = useState("");
+  const nid = useRef(9800);
+  const sf = (k:string) => (v:any) => setForm((f:any)=>({...f,[k]:v}));
+  const getPerson = (id:number,type:string) => type==="member"?members.find((m:any)=>m.id===id):visitors.find((v:any)=>v.id===id);
+  const getPersonName = (id:number,type:string) => {const p=getPerson(id,type);return p?p.first+" "+p.last:"Unknown";};
+  const save = () => {
+    if(!form.personId||!form.amountRequested){alert("Person and amount required.");return;}
+    const rec={personId:+form.personId,personType:form.personType,requestDate:form.requestDate,category:form.category,amountRequested:+form.amountRequested||0,amountApproved:+form.amountApproved||0,disbursedDate:form.disbursedDate,status:form.status,approvedBy:form.approvedBy,notes:form.notes,mealDays:form.category==="Condolence Meal"?form.mealDays:undefined};
+    if(editing){setBenevolence((b:any[])=>b.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setBenevolence((b:any[])=>[{...rec,id:nid.current++},...b]);}
+    setModal(false); setEditing(null); setForm(blank());
+  };
+  const del = (id:number)=>{if(confirm("Delete this request?"))setBenevolence((b:any[])=>b.filter(x=>x.id!==id));};
+  const openEdit=(b:any)=>{setEditing(b);setForm({personId:String(b.personId),personType:b.personType,requestDate:b.requestDate,category:b.category,amountRequested:String(b.amountRequested),amountApproved:String(b.amountApproved||""),disbursedDate:b.disbursedDate||"",status:b.status,approvedBy:b.approvedBy||"",notes:b.notes||"",mealDays:b.mealDays&&b.mealDays.length===5?b.mealDays:blankMealDays()});setModal(true);};
+  const BS_COLORS:any={Pending:AM,Approved:BL,Disbursed:GR,Denied:RE,Withdrawn:MU};
+  let shown=[...benevolence].sort((a:any,b:any)=>b.requestDate.localeCompare(a.requestDate));
+  if(filterStatus!=="All") shown=shown.filter(b=>b.status===filterStatus);
+  if(search) shown=shown.filter(b=>getPersonName(b.personId,b.personType).toLowerCase().includes(search.toLowerCase())||b.category.toLowerCase().includes(search.toLowerCase()));
+  const totalDisbursed=benevolence.filter((b:any)=>b.status==="Disbursed").reduce((a:number,b:any)=>a+b.amountApproved,0);
+  const totalPending=benevolence.filter((b:any)=>b.status==="Pending").reduce((a:number,b:any)=>a+b.amountRequested,0);
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <Stat label="Total Requests" value={benevolence.length} color={N}/>
+        <Stat label="Pending" value={benevolence.filter((b:any)=>b.status==="Pending").length} color={AM} sub={f$(totalPending)+" requested"}/>
+        <Stat label="Disbursed" value={benevolence.filter((b:any)=>b.status==="Disbursed").length} color={GR} sub={f$(totalDisbursed)+" total"}/>
+        <Stat label="Denied" value={benevolence.filter((b:any)=>b.status==="Denied").length} color={RE}/>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or category..." style={{padding:"8px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",minWidth:180}}/>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Statuses</option>
+            {BEN_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ New Request</Btn>
+      </div>
+      {shown.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No benevolence requests yet.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {shown.map((b:any)=>{
+            const sc=BS_COLORS[b.status]||MU;
+            return(<div key={b.id} style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"14px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:15,fontWeight:600,color:TX}}>{getPersonName(b.personId,b.personType)}</span>
+                    <span style={{fontSize:10,background:b.personType==="member"?"#dcfce7":"#fff3e0",color:b.personType==="member"?GR:AM,borderRadius:20,padding:"2px 8px",fontWeight:500}}>{b.personType}</span>
+                    <span style={{background:sc+"18",color:sc,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:500}}>{b.status}</span>
+                    <span style={{fontSize:12,fontWeight:500,color:N}}>{b.category}</span>
+                  </div>
+                  <div style={{display:"flex",gap:16,flexWrap:"wrap",fontSize:12,color:MU}}>
+                    <span>📅 Requested {fd(b.requestDate)}</span>
+                    <span>Requested: <strong style={{color:TX}}>{f$(b.amountRequested)}</strong></span>
+                    {b.amountApproved>0&&<span>Approved: <strong style={{color:GR}}>{f$(b.amountApproved)}</strong></span>}
+                    {b.approvedBy&&<span>By: {b.approvedBy}</span>}
+                    {b.disbursedDate&&<span>Disbursed: {fd(b.disbursedDate)}</span>}
+                  </div>
+                  {b.notes&&<div style={{fontSize:12,color:MU,fontStyle:"italic",marginTop:6}}>💬 {b.notes}</div>}
+                  {b.category==="Condolence Meal"&&b.mealDays&&b.mealDays.length>0&&(()=>{const active=b.mealDays.filter((d:any)=>d.day||(d.memberId)||(d.meal&&d.meal.trim()));return active.length>0?<div style={{marginTop:6,display:"flex",flexWrap:"wrap" as any,gap:6}}>{active.map((d:any,i:number)=>{const prov=d.memberId?members.find((m:any)=>m.id===+d.memberId):null;return(<span key={i} style={{fontSize:11,background:"#f0fdf4",color:GR,borderRadius:6,padding:"3px 8px",border:"0.5px solid #bbf7d0",fontWeight:500}}>{d.day?d.day.slice(0,3):"Slot "+(i+1)}{prov?" · "+prov.first:""}{d.meal?" — "+d.meal:""}</span>);})}</div>:null;})()}
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}>
+                  <Btn onClick={()=>openEdit(b)} v="ghost" style={{fontSize:11,padding:"4px 10px"}}>Edit</Btn>
+                  <Btn onClick={()=>del(b.id)} v="danger" style={{fontSize:11,padding:"4px 8px"}}>✕</Btn>
+                </div>
+              </div>
+            </div>);
+          })}
+        </div>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());}} title={editing?"Edit Request":"New Benevolence Request"} width={500}>
+        <Fld label="Person">
+          <select value={form.personId} onChange={e=>{const opt=e.target.selectedOptions[0];sf("personId")(e.target.value);sf("personType")(opt?.dataset.type||"member");}} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="">— Select Person —</option>
+            <optgroup label="Members">{members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((m:any)=><option key={m.id} value={m.id} data-type="member">{m.last}, {m.first}</option>)}</optgroup>
+            <optgroup label="Visitors">{visitors.sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((v:any)=><option key={v.id} value={v.id} data-type="visitor">{v.last}, {v.first}</option>)}</optgroup>
+          </select>
+        </Fld>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Request Date"><Inp type="date" value={form.requestDate} onChange={sf("requestDate")}/></Fld>
+          <Fld label="Category">
+            <select value={form.category} onChange={e=>sf("category")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {BEN_CATEGORIES.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </Fld>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Amount Requested ($)"><Inp type="number" value={form.amountRequested} onChange={sf("amountRequested")} placeholder="0.00"/></Fld>
+          <Fld label="Amount Approved ($)"><Inp type="number" value={form.amountApproved} onChange={sf("amountApproved")} placeholder="0.00"/></Fld>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Status">
+            <select value={form.status} onChange={e=>sf("status")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {BEN_STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+          <Fld label="Disbursed Date"><Inp type="date" value={form.disbursedDate} onChange={sf("disbursedDate")}/></Fld>
+        </div>
+        <Fld label="Approved By"><Inp value={form.approvedBy} onChange={sf("approvedBy")} placeholder="Pastor Hall, Board, etc."/></Fld>
+        {form.category==="Condolence Meal"&&(
+          <div style={{background:"#f0fdf4",border:"0.5px solid #bbf7d0",borderRadius:10,padding:"12px 14px",marginBottom:4}}>
+            <div style={{fontSize:11,fontWeight:600,color:GR,textTransform:"uppercase" as any,letterSpacing:0.5,marginBottom:10}}>🍽 Meal Providers (5 Slots)</div>
+            <div style={{display:"grid",gridTemplateColumns:"110px 1fr 1fr",gap:8,marginBottom:6}}>
+              <div style={{fontSize:10,fontWeight:600,color:MU,textTransform:"uppercase" as any,letterSpacing:0.4}}>Day</div>
+              <div style={{fontSize:10,fontWeight:600,color:MU,textTransform:"uppercase" as any,letterSpacing:0.4}}>Provider</div>
+              <div style={{fontSize:10,fontWeight:600,color:MU,textTransform:"uppercase" as any,letterSpacing:0.4}}>Meal Description</div>
+            </div>
+            {form.mealDays.map((d:any,i:number)=>(
+              <div key={i} style={{display:"grid",gridTemplateColumns:"110px 1fr 1fr",gap:8,marginBottom:i<4?8:0,alignItems:"center"}}>
+                <select value={d.day} onChange={e=>{const md=form.mealDays.map((x:any,j:number)=>j===i?{...x,day:e.target.value}:x);sf("mealDays")(md);}} style={{padding:"7px 8px",border:"0.5px solid "+BR,borderRadius:7,fontSize:12,outline:"none",background:"#fff",fontWeight:600,color:N}}>
+                  <option value="">— Day —</option>
+                  {MEAL_DAYS.map(dy=><option key={dy} value={dy}>{dy}</option>)}
+                </select>
+                <select value={d.memberId} onChange={e=>{const md=form.mealDays.map((x:any,j:number)=>j===i?{...x,memberId:e.target.value}:x);sf("mealDays")(md);}} style={{padding:"7px 8px",border:"0.5px solid "+BR,borderRadius:7,fontSize:12,outline:"none",background:"#fff"}}>
+                  <option value="">— Provider —</option>
+                  {members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((m:any)=><option key={m.id} value={m.id}>{m.first} {m.last}</option>)}
+                </select>
+                <input value={d.meal} onChange={e=>{const md=form.mealDays.map((x:any,j:number)=>j===i?{...x,meal:e.target.value}:x);sf("mealDays")(md);}} placeholder="Describe the meal..." style={{padding:"7px 8px",border:"0.5px solid "+BR,borderRadius:7,fontSize:12,outline:"none",fontFamily:"inherit",background:"#fff"}}/>
+              </div>
+            ))}
+          </div>
+        )}
+        <Fld label="Notes"><textarea value={form.notes} onChange={e=>sf("notes")(e.target.value)} rows={3} placeholder="Description, situation, follow-up notes..." style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/></Fld>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Submit Request"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOSPITALITY FUND LEDGER
+// ═══════════════════════════════════════════════════════════════
+const HOSP_DESC_TYPES = ["Donation","Meals Fund Withdrawal","Flower Arrangement Withdrawal","Repast Meal Withdrawal","Other"];
+function HospitalityFund({members,hospitalityFund,setHospitalityFund,hospStartBalance,setHospStartBalance}:any) {
+  const blank=()=>({date:td(),donorName:"",recipientName:"",descType:"Donation",description:"",type:"credit",amount:""});
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState<any>(blank());
+  const [editing,setEditing]=useState<any>(null);
+  const [editBal,setEditBal]=useState(false);
+  const [balInput,setBalInput]=useState(String(hospStartBalance||"0"));
+  const nid=useRef(9600);
+  const sf=(k:string)=>(v:any)=>setForm((f:any)=>({...f,[k]:v}));
+  const activeMembers=members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last));
+  const mNames=activeMembers.map((m:any)=>m.first+" "+m.last);
+  const getTypeFromDesc=(d:string)=>d==="Donation"?"credit":d.includes("Withdrawal")?"debit":null;
+  const save=()=>{
+    if(!form.amount||+form.amount<=0){alert("Amount required.");return;}
+    const rec={date:form.date,donorName:form.donorName.trim(),recipientName:form.recipientName.trim(),descType:form.descType,description:form.descType==="Other"?form.description.trim():form.descType,type:form.type,amount:+form.amount};
+    if(editing){setHospitalityFund((f:any[])=>f.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setHospitalityFund((f:any[])=>[{...rec,id:nid.current++},...f]);}
+    setModal(false);setEditing(null);setForm(blank());
+  };
+  const del=(id:number)=>{if(confirm("Delete this entry?"))setHospitalityFund((f:any[])=>f.filter(x=>x.id!==id));};
+  const openEdit=(e:any)=>{setEditing(e);setForm({date:e.date,donorName:e.donorName||"",recipientName:e.recipientName||"",descType:e.descType,description:e.description||"",type:e.type,amount:String(e.amount)});setModal(true);};
+  const startBal=parseFloat(String(hospStartBalance||0))||0;
+  const sorted=[...hospitalityFund].sort((a:any,b:any)=>a.date.localeCompare(b.date)||a.id-b.id);
+  let running=startBal;
+  const withBal=sorted.map((e:any)=>{running+=(e.type==="credit"?e.amount:-e.amount);return{...e,runningBal:running};}).reverse();
+  const totalCredits=hospitalityFund.reduce((a:number,e:any)=>e.type==="credit"?a+e.amount:a,0);
+  const totalDebits=hospitalityFund.reduce((a:number,e:any)=>e.type==="debit"?a+e.amount:a,0);
+  const currentBal=startBal+totalCredits-totalDebits;
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"stretch"}}>
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"14px 20px",minWidth:180}}>
+          <div style={{fontSize:11,color:MU,textTransform:"uppercase" as any,letterSpacing:0.5,marginBottom:4}}>Current Balance</div>
+          <div style={{fontSize:24,fontWeight:700,color:currentBal>=0?GR:RE}}>{f$(currentBal)}</div>
+        </div>
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"14px 20px",minWidth:160}}>
+          <div style={{fontSize:11,color:MU,textTransform:"uppercase" as any,letterSpacing:0.5,marginBottom:4}}>Starting Balance</div>
+          {editBal?(
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input type="number" value={balInput} onChange={e=>setBalInput(e.target.value)} style={{width:100,padding:"4px 8px",border:"0.5px solid "+BR,borderRadius:6,fontSize:14,outline:"none"}}/>
+              <button onClick={()=>{setHospStartBalance(parseFloat(balInput)||0);setEditBal(false);}} style={{padding:"4px 10px",background:GR,color:"#fff",border:"none",borderRadius:6,fontSize:12,cursor:"pointer"}}>✓</button>
+              <button onClick={()=>setEditBal(false)} style={{padding:"4px 8px",background:"transparent",border:"none",fontSize:12,color:MU,cursor:"pointer"}}>✕</button>
+            </div>
+          ):(
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18,fontWeight:600,color:N}}>{f$(startBal)}</span>
+              <button onClick={()=>{setBalInput(String(startBal));setEditBal(true);}} style={{fontSize:11,color:BL,background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>Edit</button>
+            </div>
+          )}
+        </div>
+        <Stat label="Total Credits" value={f$(totalCredits)} color={GR}/>
+        <Stat label="Total Debits" value={f$(totalDebits)} color={RE}/>
+        <Stat label="Entries" value={hospitalityFund.length} color={N}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ New Entry</Btn>
+      </div>
+      {withBal.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No entries yet. Set your starting balance and click + New Entry.</div>
+      ):(
+        <div style={{border:"0.5px solid "+BR,borderRadius:12,overflow:"hidden",background:W}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr style={{background:"#f8f9fc"}}>
+                {["Date","Description","Donor / From","Recipient / For","Debit","Credit","Balance",""].map(h=>(
+                  <th key={h} style={{padding:"10px 12px",textAlign:h==="Debit"||h==="Credit"||h==="Balance"?"right":"left",fontSize:11,fontWeight:500,color:MU,textTransform:"uppercase" as any,letterSpacing:0.4,borderBottom:"0.5px solid "+BR,whiteSpace:"nowrap" as any}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {withBal.map((e:any)=>(
+                <tr key={e.id} style={{borderBottom:"0.5px solid "+BR,background:e.type==="credit"?"#f0fdf4":"#fff7f7"}}>
+                  <td style={{padding:"10px 12px",fontSize:12,color:MU,whiteSpace:"nowrap" as any}}>{fd(e.date)}</td>
+                  <td style={{padding:"10px 12px",fontSize:12,color:N,maxWidth:180}}>{e.description}</td>
+                  <td style={{padding:"10px 12px",fontSize:12,color:MU}}>{e.donorName||"—"}</td>
+                  <td style={{padding:"10px 12px",fontSize:12,color:MU}}>{e.recipientName||"—"}</td>
+                  <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:600,color:e.type==="debit"?RE:MU}}>{e.type==="debit"?f$(e.amount):"—"}</td>
+                  <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:600,color:e.type==="credit"?GR:MU}}>{e.type==="credit"?f$(e.amount):"—"}</td>
+                  <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:e.runningBal>=0?N:RE}}>{f$(e.runningBal)}</td>
+                  <td style={{padding:"10px 8px"}}>
+                    <div style={{display:"flex",gap:4}}>
+                      <Btn onClick={()=>openEdit(e)} v="ghost" style={{fontSize:10,padding:"3px 8px"}}>Edit</Btn>
+                      <Btn onClick={()=>del(e.id)} v="danger" style={{fontSize:10,padding:"3px 6px"}}>✕</Btn>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              <tr style={{background:"#f8f9fc",fontWeight:700}}>
+                <td colSpan={4} style={{padding:"10px 12px",fontSize:12,color:MU}}>Totals</td>
+                <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,color:RE}}>{f$(totalDebits)}</td>
+                <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,color:GR}}>{f$(totalCredits)}</td>
+                <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,color:currentBal>=0?N:RE}}>{f$(currentBal)}</td>
+                <td/>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());}} title={editing?"Edit Entry":"New Ledger Entry"} width={500}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Date"><Inp type="date" value={form.date} onChange={sf("date")}/></Fld>
+          <Fld label="Type">
+            <select value={form.type} onChange={e=>sf("type")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              <option value="credit">Credit (Money In)</option>
+              <option value="debit">Debit (Money Out)</option>
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Description">
+          <select value={form.descType} onChange={e=>{const v=e.target.value;sf("descType")(v);const t=getTypeFromDesc(v);if(t)sf("type")(t);}} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",marginBottom:form.descType==="Other"?6:0}}>
+            {HOSP_DESC_TYPES.map(d=><option key={d} value={d}>{d}</option>)}
+          </select>
+          {form.descType==="Other"&&<Inp value={form.description} onChange={sf("description")} placeholder="Describe this entry..."/>}
+        </Fld>
+        <Fld label="Amount ($)"><Inp type="number" value={form.amount} onChange={sf("amount")} placeholder="0.00"/></Fld>
+        <Fld label="Donor / From (optional)">
+          <input list="hosp-donor-list" value={form.donorName} onChange={e=>sf("donorName")(e.target.value)} placeholder="Type member name..." style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box" as any}}/>
+          <datalist id="hosp-donor-list">{mNames.map(n=><option key={n} value={n}/>)}</datalist>
+        </Fld>
+        <Fld label="Recipient / For (optional)">
+          <input list="hosp-recip-list" value={form.recipientName} onChange={e=>sf("recipientName")(e.target.value)} placeholder="Type member name..." style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box" as any}}/>
+          <datalist id="hosp-recip-list">{mNames.map(n=><option key={n} value={n}/>)}</datalist>
+        </Fld>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Add Entry"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PASTORAL COUNSELING LOG  (private — pastor/admin only)
+// ═══════════════════════════════════════════════════════════════
+const COUNSEL_CATEGORIES = ["Marriage","Grief / Loss","Addiction","Financial","Family","Spiritual","Mental Health","Conflict","Life Coaching","Pre-Marital","Other"];
+const COUNSEL_STATUSES = ["Active","On Hold","Referred","Completed"];
+function CounselingLog({members,visitors,counselingLogs,setCounselingLogs}:any) {
+  const blank=()=>({personId:"",personType:"member",sessionDate:td(),category:"Marriage",counselor:"",sessionNotes:"",actionItems:"",nextSession:"",status:"Active",confidential:true});
+  const [modal,setModal] = useState(false);
+  const [form,setForm] = useState<any>(blank());
+  const [editing,setEditing] = useState<any>(null);
+  const [filterCat,setFilterCat] = useState("All");
+  const [filterStatus,setFilterStatus] = useState("All");
+  const [search,setSearch] = useState("");
+  const [expanded,setExpanded] = useState<number|null>(null);
+  const nid = useRef(9900);
+  const sf = (k:string) => (v:any) => setForm((f:any)=>({...f,[k]:v}));
+  const getPerson = (id:number,type:string) => type==="member"?members.find((m:any)=>m.id===id):visitors.find((v:any)=>v.id===id);
+  const getPersonName = (id:number,type:string) => {const p=getPerson(id,type);return p?p.first+" "+p.last:"Unknown";};
+  const save = () => {
+    if(!form.personId||!form.sessionDate||!form.category){alert("Person, date, and category required.");return;}
+    const rec={personId:+form.personId,personType:form.personType,sessionDate:form.sessionDate,category:form.category,counselor:form.counselor,sessionNotes:form.sessionNotes,actionItems:form.actionItems,nextSession:form.nextSession,status:form.status,confidential:true};
+    if(editing){setCounselingLogs((l:any[])=>l.map(x=>x.id===editing.id?{...x,...rec}:x));}
+    else{setCounselingLogs((l:any[])=>[{...rec,id:nid.current++},...l]);}
+    setModal(false); setEditing(null); setForm(blank());
+  };
+  const del = (id:number)=>{if(confirm("Permanently delete this counseling record?"))setCounselingLogs((l:any[])=>l.filter(x=>x.id!==id));};
+  const openEdit=(l:any)=>{setEditing(l);setForm({personId:String(l.personId),personType:l.personType,sessionDate:l.sessionDate,category:l.category,counselor:l.counselor||"",sessionNotes:l.sessionNotes||"",actionItems:l.actionItems||"",nextSession:l.nextSession||"",status:l.status,confidential:true});setModal(true);};
+  const CS_COLORS:any={Active:BL,"On Hold":AM,Referred:PU,Completed:GR};
+  let shown=[...counselingLogs].sort((a:any,b:any)=>b.sessionDate.localeCompare(a.sessionDate));
+  if(filterCat!=="All") shown=shown.filter(l=>l.category===filterCat);
+  if(filterStatus!=="All") shown=shown.filter(l=>l.status===filterStatus);
+  if(search) shown=shown.filter(l=>getPersonName(l.personId,l.personType).toLowerCase().includes(search.toLowerCase())||l.category.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div>
+      <div style={{background:"#fef3c7",border:"1px solid "+G,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#7a5c10"}}>
+        🔒 <strong>Confidential.</strong> Counseling records are private and visible only to authorized staff. Handle all entries with pastoral discretion.
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <Stat label="Total Sessions" value={counselingLogs.length} color={N}/>
+        <Stat label="Active Cases" value={counselingLogs.filter((l:any)=>l.status==="Active").length} color={BL}/>
+        <Stat label="Completed" value={counselingLogs.filter((l:any)=>l.status==="Completed").length} color={GR}/>
+        <Stat label="Unique Persons" value={new Set(counselingLogs.map((l:any)=>l.personType+":"+l.personId)).size} color={PU}/>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or topic..." style={{padding:"8px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",minWidth:180}}/>
+          <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Topics</option>
+            {COUNSEL_CATEGORIES.map(c=><option key={c}>{c}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="All">All Statuses</option>
+            {COUNSEL_STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <Btn onClick={()=>{setEditing(null);setForm(blank());setModal(true);}}>+ Log Session</Btn>
+      </div>
+      {shown.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center",color:MU}}>No counseling sessions logged yet.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {shown.map((l:any)=>{
+            const sc=CS_COLORS[l.status]||MU;
+            const isExp=expanded===l.id;
+            return(<div key={l.id} style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"14px 16px",cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:l.id)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:15,fontWeight:600,color:TX}}>{getPersonName(l.personId,l.personType)}</span>
+                    <span style={{background:sc+"18",color:sc,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:500}}>{l.status}</span>
+                    <span style={{background:PU+"18",color:PU,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:500}}>{l.category}</span>
+                    <span style={{fontSize:11,color:MU}}>🔒 Confidential</span>
+                  </div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,color:MU}}>
+                    <span>📅 {fd(l.sessionDate)}</span>
+                    {l.counselor&&<span>👤 {l.counselor}</span>}
+                    {l.nextSession&&<span style={{color:AM}}>⏰ Next: {fd(l.nextSession)}</span>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                  <Btn onClick={()=>openEdit(l)} v="ghost" style={{fontSize:11,padding:"4px 10px"}}>Edit</Btn>
+                  <Btn onClick={()=>del(l.id)} v="danger" style={{fontSize:11,padding:"4px 8px"}}>✕</Btn>
+                </div>
+              </div>
+              {isExp&&(
+                <div style={{marginTop:12,borderTop:"0.5px solid "+BR,paddingTop:10}}>
+                  {l.sessionNotes&&<div style={{marginBottom:8}}><div style={{fontSize:11,color:MU,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,marginBottom:3}}>Session Notes</div><div style={{fontSize:13,color:TX,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{l.sessionNotes}</div></div>}
+                  {l.actionItems&&<div><div style={{fontSize:11,color:MU,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,marginBottom:3}}>Action Items</div><div style={{fontSize:13,color:TX,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{l.actionItems}</div></div>}
+                </div>
+              )}
+            </div>);
+          })}
+        </div>
+      )}
+      <Modal open={modal} onClose={()=>{setModal(false);setEditing(null);setForm(blank());}} title={editing?"Edit Session":"Log Counseling Session"} width={520}>
+        <Fld label="Person">
+          <select value={form.personId} onChange={e=>{const opt=e.target.selectedOptions[0];sf("personId")(e.target.value);sf("personType")(opt?.dataset.type||"member");}} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+            <option value="">— Select Person —</option>
+            <optgroup label="Members">{members.filter((m:any)=>m.status==="Active").sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((m:any)=><option key={m.id} value={m.id} data-type="member">{m.last}, {m.first}</option>)}</optgroup>
+            <optgroup label="Visitors">{visitors.sort((a:any,b:any)=>a.last.localeCompare(b.last)).map((v:any)=><option key={v.id} value={v.id} data-type="visitor">{v.last}, {v.first}</option>)}</optgroup>
+          </select>
+        </Fld>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Session Date"><Inp type="date" value={form.sessionDate} onChange={sf("sessionDate")}/></Fld>
+          <Fld label="Category">
+            <select value={form.category} onChange={e=>sf("category")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {COUNSEL_CATEGORIES.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </Fld>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Fld label="Counselor"><Inp value={form.counselor} onChange={sf("counselor")} placeholder="Pastor Hall, etc."/></Fld>
+          <Fld label="Status">
+            <select value={form.status} onChange={e=>sf("status")(e.target.value)} style={{width:"100%",padding:"9px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}>
+              {COUNSEL_STATUSES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </Fld>
+        </div>
+        <Fld label="Next Session (optional)"><Inp type="date" value={form.nextSession} onChange={sf("nextSession")}/></Fld>
+        <Fld label="Session Notes (confidential)"><textarea value={form.sessionNotes} onChange={e=>sf("sessionNotes")(e.target.value)} rows={4} placeholder="What was discussed, observations, spiritual guidance given..." style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/></Fld>
+        <Fld label="Action Items"><textarea value={form.actionItems} onChange={e=>sf("actionItems")(e.target.value)} rows={2} placeholder="Prayer assignments, scriptures to read, follow-up tasks..." style={{width:"100%",padding:"8px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/></Fld>
+        <div style={{display:"flex",gap:8,marginTop:6}}>
+          <Btn onClick={save} style={{flex:1,justifyContent:"center"}}>{editing?"Save Changes":"Save Session"}</Btn>
+          <Btn v="ghost" onClick={()=>{setModal(false);setEditing(null);setForm(blank());}} style={{flex:1,justifyContent:"center"}}>Cancel</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
 
 function ProspectsPage({prospects,setProspects,members}:any) {
   const blank = () => ({first:"",last:"",phone:"",street:"",city:"",state:"",zip:"",invitedBy:"",invitedById:null,status:"Not Contacted",notes:""});
@@ -10988,6 +11829,7 @@ function ManualPage(){
     {id:'s15',label:'16. AI Assistant'},{id:'s23',label:'17. Alerts & Reports'},{id:'s22',label:'18. Appearance & Themes'},{id:'s16',label:'19. Settings'},
     {id:'s17',label:'20. Backup & Restore'},{id:'s18',label:'21. Maintenance'},{id:'s19',label:'22. Printer Setup'},
     {id:'s20',label:'23. Member Portal'},
+    {id:'s24',label:'24. Multi-Campus'},
   ];
   const H=({id,children}:any)=><h2 ref={setRef(id)} style={{fontSize:17,fontWeight:600,color:N,margin:'0 0 14px',paddingBottom:10,borderBottom:'2px solid '+G}}>{children}</h2>;
   const H3=({children}:any)=><h3 style={{fontSize:13,fontWeight:600,color:N,margin:'18px 0 8px',textTransform:'uppercase',letterSpacing:0.4}}>{children}</h3>;
@@ -11014,7 +11856,7 @@ function ManualPage(){
         <div style={{background:N,borderRadius:12,padding:'20px 24px',marginBottom:20}}>
           <div style={{color:'#fff',fontSize:21,fontWeight:600,letterSpacing:0.3}}>ChurchOS Staff Manual</div>
           <div style={{color:G,fontSize:13,marginTop:4}}>New Testament Christian Church — Administrator Guide</div>
-          <div style={{color:'#7a9acc',fontSize:12,marginTop:6}}>Version 6.4 · May 2026 · For internal staff use</div>
+          <div style={{color:'#7a9acc',fontSize:12,marginTop:6}}>Version 6.5 · May 2026 · For internal staff use</div>
         </div>
 
         <Sec><H id="s1">1. Getting Started</H>
@@ -11195,6 +12037,9 @@ function ManualPage(){
 
         <Sec><H id="s9">9. Attendance</H>
           <P>The <B>Attendance</B> section records service headcounts and individual member attendance over time.</P>
+          <H3>Campus Filtering</H3>
+          <P>When two or more campuses are configured and a specific campus is selected in the header campus selector, the Attendance section automatically filters all stats and records to that campus only. Service records logged while a campus is active are tagged to that campus. Select <B>All</B> in the campus selector to view combined attendance across all campuses.</P>
+          <Note>Attendance records created before multi-campus was set up default to the main campus (campus_main) and will appear under the primary campus filter.</Note>
           <H3>Recording Attendance</H3>
           <Ol><Li>Go to <B>Attendance</B> in the sidebar and click <B>+ Record Attendance</B></Li><Li>Select the service type (Sunday Morning, Sunday Evening, Wednesday, Special Service)</Li><Li>Enter the date and total headcount</Li><Li>Optionally mark specific members as present individually</Li><Li>Click <B>Save</B></Li></Ol>
           <H3>Viewing History</H3>
@@ -11465,8 +12310,33 @@ function ManualPage(){
           <Warn>Member Portal users cannot access any staff features — member lists, visitation records, giving reports, access control, or any administrative function. The portal is completely separated from the staff interface and shows only the logged-in member's own data.</Warn>
         </Sec>
 
+        <Sec><H id="s24">24. Multi-Campus</H>
+          <P>ChurchOS supports multi-site churches through a built-in campus management system. Administrators can create and manage multiple campuses, assign members and visitors to a campus, and filter the Members, Attendance, and Giving sections by campus — all without separate databases or accounts.</P>
+          <H3>Setting Up Campuses</H3>
+          <Ol><Li>Click <B>Settings</B> in the sidebar and select the <B>🏛 Campuses</B> tab</Li><Li>The default campus (<B>Central HQ Campus</B>) is pre-created. Click <B>+ Add Campus</B> to create additional campuses.</Li><Li>Enter the campus name and click <B>Save</B></Li><Li>Repeat for each campus location. Campus names appear in the header selector and throughout the app.</Li></Ol>
+          <H3>Renaming or Deleting a Campus</H3>
+          <Ol><Li>Go to <B>Settings → 🏛 Campuses</B></Li><Li>Click the pencil icon next to any campus name to rename it inline, then click <B>Save</B></Li><Li>Click the trash icon to delete a campus. Deleting a campus does not delete the members assigned to it — their campus field retains the old campus ID until reassigned.</Li></Ol>
+          <Note>Campus data is synced to Supabase cloud, so campus names and assignments are shared across all devices and staff accounts. Changes are visible to all staff on their next page load.</Note>
+          <H3>Selecting the Active Campus (Header Selector)</H3>
+          <P>When two or more campuses exist, a <B>campus dropdown</B> appears in the top header bar (next to the AI and Settings buttons). Click it to switch the active campus. The selected campus filters the Members, Attendance, and Giving sections simultaneously.</P>
+          <Ul><Li><B>All</B> — shows combined data from all campuses (default)</Li><Li><B>Specific Campus</B> — shows only members, attendance, and giving for that campus</Li></Ul>
+          <Tip>The campus selector is visible on both desktop and mobile. Use it at the start of each service to set context before logging attendance or giving for that location.</Tip>
+          <H3>Assigning a Member to a Campus</H3>
+          <P>Individual campus assignment is done through the member's edit form:</P>
+          <Ol><Li>Open the member's profile and click <B>Edit Profile</B></Li><Li>When two or more campuses exist, a <B>Campus</B> dropdown appears in the edit form</Li><Li>Select the campus this member attends and click <B>Save Changes</B></Li></Ol>
+          <H3>Bulk Campus Assignment</H3>
+          <P>To assign a large group of members to a campus at once:</P>
+          <Ol><Li>Go to <B>Members Profile</B> and use the search, filter, or scroll to find the members to reassign</Li><Li>Check the checkboxes on each member row (or use <B>Select All</B> for the full filtered list)</Li><Li>Click the <B>🏛 Campus</B> button in the gold bulk action toolbar</Li><Li>Select the target campus from the dropdown in the modal</Li><Li>Click <B>Assign Campus</B></Li></Ol>
+          <P>All selected members are updated instantly. A confirmation message shows how many were reassigned.</P>
+          <Tip>Use filters first to narrow the list before bulk-assigning. For example: filter by <B>Group = Choir</B> then Select All to assign the entire choir to a campus in one action.</Tip>
+          <Warn>Bulk campus assignment overwrites the existing campus on every selected record immediately. There is no undo. Double-check your selection before confirming.</Warn>
+          <H3>Campus Filtering in Other Sections</H3>
+          <Ul><Li><B>Members Profile</B> — when a campus is active, only members and visitors assigned to that campus appear in the list. Select All in the header to see everyone.</Li><Li><B>Attendance</B> — stats and the service log filter to the active campus. New service records auto-tag the active campus.</Li><Li><B>Giving</B> — giving stats and the donation table filter to the active campus. New giving entries auto-tag the active campus.</Li></Ul>
+          <Note>Members and records created before multi-campus was configured default to <B>campus_main</B> (the original primary campus). They will appear when the first campus or <B>All</B> is selected, and can be reassigned using the bulk or individual campus tools.</Note>
+        </Sec>
+
         <div style={{textAlign:'center',padding:'24px 0 8px',borderTop:'0.5px solid '+BR,marginTop:4}}>
-          <div style={{fontSize:12,color:MU}}>ChurchOS Staff Manual · New Testament Christian Church · Version 6.4 · May 2026</div>
+          <div style={{fontSize:12,color:MU}}>ChurchOS Staff Manual · New Testament Christian Church · Version 6.5 · May 2026</div>
           <div style={{fontSize:11,color:MU,marginTop:4}}>For technical support or feature requests, contact your system administrator.</div>
         </div>
       </div>
@@ -11681,6 +12551,13 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const [members,setMembers] = useState(lsGet('members') ?? _I.members ?? []);
   const [visitors,setVisitors] = useState(lsGet('visitors') ?? _I.visitors ?? []);
   const [prospects,setProspects] = useState(lsGet('prospects') ?? []);
+  const [volunteerSlots,setVolunteerSlots] = useState(lsGet('volunteerSlots') ?? []);
+  const [classEnrollments,setClassEnrollments] = useState(lsGet('classEnrollments') ?? []);
+  const [sickVisits,setSickVisits] = useState(lsGet('sickVisits') ?? []);
+  const [benevolence,setBenevolence] = useState(lsGet('benevolence') ?? []);
+  const [hospitalityFund,setHospitalityFund] = useState(lsGet('hospitalityFund') ?? []);
+  const [hospStartBalance,setHospStartBalance] = useState(lsGet('hospStartBalance') ?? 0);
+  const [counselingLogs,setCounselingLogs] = useState(lsGet('counselingLogs') ?? []);
   const [attendance,setAttendance] = useState(lsGet('attendance') ?? _I.attendance ?? []);
   const [giving,setGiving] = useState(lsGet('giving') ?? _I.giving ?? []);
   const [prayers,setPrayers] = useState(lsGet('prayers') ?? _I.prayers ?? []);
@@ -11852,6 +12729,13 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   useEffect(()=>{lsSave('roles',roles);},[JSON.stringify(roles)]);
   useEffect(()=>{lsSave('permissions',permissions);},[JSON.stringify(permissions)]);
   useEffect(()=>{lsSave('prospects',prospects);},[JSON.stringify(prospects)]);
+  useEffect(()=>{lsSave('volunteerSlots',volunteerSlots);},[JSON.stringify(volunteerSlots)]);
+  useEffect(()=>{lsSave('classEnrollments',classEnrollments);},[JSON.stringify(classEnrollments)]);
+  useEffect(()=>{lsSave('sickVisits',sickVisits);},[JSON.stringify(sickVisits)]);
+  useEffect(()=>{lsSave('benevolence',benevolence);},[JSON.stringify(benevolence)]);
+  useEffect(()=>{lsSave('hospitalityFund',hospitalityFund);},[JSON.stringify(hospitalityFund)]);
+  useEffect(()=>{lsSave('hospStartBalance',hospStartBalance);},[hospStartBalance]);
+  useEffect(()=>{lsSave('counselingLogs',counselingLogs);},[JSON.stringify(counselingLogs)]);
 
   // ── Load from Supabase on mount — cloud is source of truth across devices ──
   useEffect(()=>{
@@ -11905,6 +12789,13 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       if(d.permissions&&Object.keys(d.permissions).length) setPermissions(d.permissions);
       if(Array.isArray(d.users)&&d.users.length) setUsers(d.users);
       if(Array.isArray(d.prospects)) setProspects(d.prospects); // trust empty array — removal on another device must propagate
+      if(Array.isArray(d.volunteerSlots)) setVolunteerSlots(d.volunteerSlots);
+      if(Array.isArray(d.classEnrollments)) setClassEnrollments(d.classEnrollments);
+      if(Array.isArray(d.sickVisits)) setSickVisits(d.sickVisits);
+      if(Array.isArray(d.benevolence)) setBenevolence(d.benevolence);
+      if(Array.isArray(d.hospitalityFund)) setHospitalityFund(d.hospitalityFund);
+      if(typeof d.hospStartBalance==="number") setHospStartBalance(d.hospStartBalance);
+      if(Array.isArray(d.counselingLogs)) setCounselingLogs(d.counselingLogs);
       if(d.churchSettings?.name){setChurchSettings(d.churchSettings);try{localStorage.setItem(LS('church_settings'),JSON.stringify(d.churchSettings));}catch(e){}}
       if(Array.isArray(d.campuses)&&d.campuses.length) setCampuses(d.campuses);
       lastSyncAt.current = Date.now();
@@ -11957,7 +12848,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const blob = {members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses};
+        progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses,
+        volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -11969,7 +12861,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   },[JSON.stringify({members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
     children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
     emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
-    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses})]);
+    progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses,
+    volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs})]);
 
   const nidEmail = useRef(8000);
   const logEmail = (data) => {
@@ -12030,6 +12923,12 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     {id:"addperson",label:"Add Person",icon:"➕"},
     {id:"people",label:"Members Profile",icon:"P"},
     {id:"prospects",label:"Prospects",icon:"🎯"},
+    {id:"volunteer",label:"Volunteer & Usher Scheduler",icon:"📋"},
+    {id:"classes",label:"Classes & Leadership Training",icon:"🎓"},
+    {id:"sickvisit",label:"Hospital & Sick Visit Log",icon:"🏥"},
+    {id:"benevolence",label:"Benevolence Fund",icon:"🤝"},
+    {id:"hospitality",label:"Hospitality Account",icon:"🍽"},
+    {id:"counseling",label:"Pastoral Counseling Log",icon:"🔒"},
     {id:"visitation",label:"Visitation",icon:"V"},
     {id:"groups",label:"Groups Ministry",icon:"G2"},
     {id:"education",label:"Education",icon:"Ed"},
@@ -12050,6 +12949,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const NAV_MOD_MAP:Record<string,string|null> = {
     dashboard:null, addperson:"addperson", people:"directory",
     prospects:null,
+    volunteer:null, classes:null, sickvisit:null, benevolence:null, hospitality:null, counseling:null,
     visitation:"visitation", groups:"groups", education:"education",
     maintenance:"maintenance", calendar:"events", attendance:"attendance",
     giving:"giving", prayer:"prayer", email:null, sms:null,
@@ -12076,7 +12976,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         });
         return staffMemberRecord ? [...filtered, {id:"myprofile",label:"My Profile",icon:"👤"}] : filtered;
       })();
-  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",manual:"Staff Manual",myprofile:"My Profile"};
+  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",volunteer:"Volunteer & Usher Scheduler",classes:"Classes & Leadership Training",sickvisit:"Hospital & Sick Visit Log",benevolence:"Benevolence Fund",hospitality:"Hospitality Account",counseling:"Pastoral Counseling Log",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",manual:"Staff Manual",myprofile:"My Profile"};
   const pending = users.filter(u=>u.status==="Pending").length;
   const fu = visitors.filter(v=>v.stage==="Follow-Up Needed").length;
   const inVis = visitRecords.filter(r=>r.stage!=="Complete").length;
@@ -12300,6 +13200,12 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             </div>
           )}
           {!isMemberPortal && view==="prospects" && <ProspectsPage prospects={prospects} setProspects={setProspects} members={members}/>}
+          {!isMemberPortal && view==="volunteer" && <VolunteerScheduler members={members} volunteerSlots={volunteerSlots} setVolunteerSlots={setVolunteerSlots}/>}
+          {!isMemberPortal && view==="classes" && <ClassesTracker members={members} classEnrollments={classEnrollments} setClassEnrollments={setClassEnrollments}/>}
+          {!isMemberPortal && view==="sickvisit" && <SickVisitLog members={members} visitors={visitors} sickVisits={sickVisits} setSickVisits={setSickVisits} users={users}/>}
+          {!isMemberPortal && view==="benevolence" && <BenevolencePage members={members} visitors={visitors} benevolence={benevolence} setBenevolence={setBenevolence}/>}
+          {!isMemberPortal && view==="hospitality" && <HospitalityFund members={members} hospitalityFund={hospitalityFund} setHospitalityFund={setHospitalityFund} hospStartBalance={hospStartBalance} setHospStartBalance={setHospStartBalance}/>}
+          {!isMemberPortal && view==="counseling" && <CounselingLog members={members} visitors={visitors} counselingLogs={counselingLogs} setCounselingLogs={setCounselingLogs}/>}
           {!isMemberPortal && view==="visitation" && <Visitation visitors={visitors} setVisitors={setVisitors} members={members} setMembers={setMembers} users={users} currentUser={currentUser} roles={roles} visitRecords={visitRecords} setVisitRecords={setVisitRecords} setView={setView} canAddVisitor={canAddVisitor}/>}
           {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView} activeCampusId={activeCampusId} campuses={campuses}/>}
           {!isMemberPortal && view==="giving" && <Giving giving={giving} setGiving={setGiving} pledgeDrives={pledgeDrives} setPledgeDrives={setPledgeDrives} pledges={pledges} setPledges={setPledges} members={members} visitors={visitors} weeklyReports={weeklyReports} setWeeklyReports={setWeeklyReports} emailTemplates={emailTemplates} currentUser={currentUser} roles={roles} activeCampusId={activeCampusId} campuses={campuses}/>}
