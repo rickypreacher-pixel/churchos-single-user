@@ -12645,6 +12645,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const [benevolence,setBenevolence] = useState(lsGet('benevolence') ?? []);
   const [hospitalityFund,setHospitalityFund] = useState(lsGet('hospitalityFund') ?? []);
   const [hospStartBalance,setHospStartBalance] = useState(lsGet('hospStartBalance') ?? 0);
+  const hospStartReady = useRef(false); // true once the cloud value is loaded or the user sets it — guards a fresh device from saving its default 0 over a real balance
+  const hospCloudVal = useRef<any>(null); // last starting balance loaded from the cloud (what to write until this device has loaded)
   const [counselingLogs,setCounselingLogs] = useState(lsGet('counselingLogs') ?? []);
   // Admin Notes read-tracking — shared set of note ids checked off; synced in the church_data blob.
   const [adminNotesRead,setAdminNotesRead] = useState(lsGet('adminNotesRead') ?? []);
@@ -12886,7 +12888,12 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       if(Array.isArray(d.sickVisits)) setSickVisits(d.sickVisits);
       if(Array.isArray(d.benevolence)) setBenevolence(d.benevolence);
       if(Array.isArray(d.hospitalityFund)) setHospitalityFund(d.hospitalityFund);
-      if(typeof d.hospStartBalance==="number") setHospStartBalance(d.hospStartBalance);
+      if(typeof d.hospStartBalance==="number"){
+        hospCloudVal.current = d.hospStartBalance;
+        // Don't let a stale cloud 0 wipe a real local starting balance (it self-heals on the next save).
+        if(d.hospStartBalance!==0 || hospStartBalance===0) setHospStartBalance(d.hospStartBalance);
+        hospStartReady.current = true;
+      }
       if(Array.isArray(d.counselingLogs)) setCounselingLogs(d.counselingLogs);
       if(d.churchSettings?.name){setChurchSettings(d.churchSettings);try{localStorage.setItem(LS('church_settings'),JSON.stringify(d.churchSettings));}catch(e){}}
       if(Array.isArray(d.campuses)&&d.campuses.length) setCampuses(d.campuses);
@@ -12937,11 +12944,15 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         setCloudSync('idle');
         return;
       }
+      // Until this device has loaded the cloud starting balance, write the last-known cloud value
+      // (not our default 0) so a fresh/not-yet-synced device can never wipe a real balance.
+      const _hospBal = hospStartReady.current ? hospStartBalance
+        : (typeof hospCloudVal.current==='number' ? hospCloudVal.current : hospStartBalance);
       const blob = {members,visitors,attendance,giving,prayers,groups,grpMeetings,visitRecords,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
         progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses,
-        volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs,adminNotesRead};
+        volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance:_hospBal,counselingLogs,adminNotesRead};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -13303,7 +13314,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="classes" && <ClassesTracker members={members} classEnrollments={classEnrollments} setClassEnrollments={setClassEnrollments}/>}
           {!isMemberPortal && view==="sickvisit" && <SickVisitLog members={members} visitors={visitors} sickVisits={sickVisits} setSickVisits={setSickVisits} users={users}/>}
           {!isMemberPortal && view==="benevolence" && <BenevolencePage members={members} visitors={visitors} benevolence={benevolence} setBenevolence={setBenevolence}/>}
-          {!isMemberPortal && view==="hospitality" && <HospitalityFund members={members} hospitalityFund={hospitalityFund} setHospitalityFund={setHospitalityFund} hospStartBalance={hospStartBalance} setHospStartBalance={setHospStartBalance}/>}
+          {!isMemberPortal && view==="hospitality" && <HospitalityFund members={members} hospitalityFund={hospitalityFund} setHospitalityFund={setHospitalityFund} hospStartBalance={hospStartBalance} setHospStartBalance={(v:any)=>{hospStartReady.current=true;setHospStartBalance(v);}}/>}
           {!isMemberPortal && view==="counseling" && <CounselingLog members={members} visitors={visitors} counselingLogs={counselingLogs} setCounselingLogs={setCounselingLogs}/>}
           {!isMemberPortal && view==="visitation" && <Visitation visitors={visitors} setVisitors={setVisitors} members={members} setMembers={setMembers} users={users} currentUser={currentUser} roles={roles} visitRecords={visitRecords} setVisitRecords={setVisitRecords} setView={setView} canAddVisitor={canAddVisitor}/>}
           {!isMemberPortal && view==="attendance" && <Attendance attendance={attendance} setAttendance={setAttendance} setView={setView} activeCampusId={activeCampusId} campuses={campuses}/>}
