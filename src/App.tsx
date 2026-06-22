@@ -4176,6 +4176,15 @@ Keep it to 3-4 short paragraphs. Professional yet warm in tone.`;
   const convertToMember = (rec) => {
     const v = getV(rec.visitorId);
     if(!v) return;
+    // Returning member (was sent to follow-up from the directory): restore the ORIGINAL member
+    // record instead of creating a duplicate.
+    if(v.fromMemberId!=null){
+      if(!confirm(`Return ${v.first} ${v.last} to the Members directory?\n\nThis restores their original member record and closes this follow-up.`)) return;
+      setMembers((ms:any[])=>ms.map((x:any)=>String(x.id)===String(v.fromMemberId)?{...x,inFollowUp:false}:x));
+      setVisitRecords((rs:any[])=>rs.map((r:any)=>r.id===rec.id?{...r,stage:"Converted",completedDate:td(),completionReason:"Returned to Members"}:r));
+      setVisitors((vs:any[])=>vs.map((v2:any)=>v2.id===v.id?{...v2,stage:"Member"}:v2));
+      return;
+    }
     const careContacts = (rec.contacts||[]).filter(c=>c.stage==="OngoingCare");
     if(!confirm(`Convert ${v.first} ${v.last} to an Active Member?\n\nThis will:\n• Add them to the Members directory as Active\n• Mark their visitation record as Converted\n\nThey have completed ${careContacts.length} ongoing care check-ins.`)) return;
     // Add to members
@@ -6887,7 +6896,7 @@ function People({members,setMembers,visitors,setVisitors,attendance,giving,setGi
     }
     return true;
   });
-  const rawList = tab==="members" ? members : visitors;
+  const rawList = tab==="members" ? members.filter((m:any)=>!m.inFollowUp) : visitors;
   const filt = applyFilters(rawList, search.trim().toLowerCase());
   const selectedPeople = filt.filter((p:any)=>selected.has(p.id));
   const allSelected = filt.length>0 && filt.every((p:any)=>selected.has(p.id));
@@ -11542,7 +11551,33 @@ function AdminNotes({notes=[], readIds=[], setReadIds, campuses=[], activeCampus
   );
 }
 
-function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visitRecords}:any){
+function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visitRecords,setMembers,setVisitors,setVisitRecords,activeCampusId='all',setView}:any){
+  // Send a stopped-attending member (and their household) into the Visitation pipeline at "Pastor
+  // Visit": create a returning-visitor entry + a Pastor-stage record, and tag the member inFollowUp
+  // so they leave the Members directory until they re-engage. Reversible from Visitation (Convert).
+  const sendToFollowUp = (m:any) => {
+    if(typeof setMembers!=="function"||typeof setVisitors!=="function"){ alert("Unable to send to follow-up here."); return; }
+    const household = (members||[]).filter((x:any)=> String(x.id)===String(m.id) || (m.familyId && x.familyId===m.familyId) || (m.family && String(m.family).trim()!=="" && x.family===m.family));
+    const alreadyVis = new Set((visitors||[]).filter((v:any)=>v?.fromMemberId!=null).map((v:any)=>String(v.fromMemberId)));
+    const toMove = household.filter((p:any)=> !p.inFollowUp && !alreadyVis.has(String(p.id)));
+    if(toMove.length===0){ alert("Already in follow-up."); return; }
+    const isFam = toMove.length>1;
+    if(!confirm(`Send ${isFam?`the ${m.last} household (${toMove.length} people)`:m.first+" "+m.last} to Visitation → Pastor Visit?\n\nThey move OUT of the Members directory into the Visitation pipeline until they re-engage. You can return them anytime from Visitation (Convert to Member).`)) return;
+    const base = Date.now();
+    const newVisitors:any[] = []; const newRecs:any[] = [];
+    toMove.forEach((p:any,i:number)=>{
+      const vid = base+i;
+      const { status, role, joined, inFollowUp, ...rest } = p;
+      newVisitors.push({ ...rest, id:vid, type:"Visitor", stage:"Returning", firstVisit:td(), fromMemberId:p.id, campus:p.campus||'campus_main', sponsor:"", notes:((p.notes?p.notes+" · ":"")+"Returning member · stopped attending — sent to Pastor Visit "+td()) });
+      newRecs.push({ id:base+5000+i, visitorId:vid, stage:"Pastor", createdDate:td(), contacts:[], teamSupervisorUserId:null, teamLeaderUserId:null, sponsorUserId:null, fromMemberId:p.id });
+    });
+    const moveIds = new Set(toMove.map((p:any)=>String(p.id)));
+    setVisitors((vs:any[])=>[...(Array.isArray(vs)?vs:[]), ...newVisitors]);
+    if(typeof setVisitRecords==="function") setVisitRecords((rs:any[])=>[...(Array.isArray(rs)?rs:[]), ...newRecs]);
+    setMembers((ms:any[])=>ms.map((x:any)=> moveIds.has(String(x.id)) ? {...x, inFollowUp:true} : x));
+    alert(`${isFam?toMove.length+" household members":m.first+" "+m.last} moved to Visitation → Pastor Visit.`);
+    if(typeof setView==="function") setView("visitation");
+  };
   const [tab,setTab] = useState(0);
   const TABS = ["Absent Members","Low Giving","Phone Directory","Absent Children","Birthdays","Outstanding Visits"];
 
@@ -11573,6 +11608,7 @@ function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visit
     const cutoffMs = 4*7*24*60*60*1000; // 4 weeks
     return (members||[]).filter((m:any)=>{
       if(m.status!=="Active") return false;
+      if(m.inFollowUp) return false; // already moved to Visitation → Pastor Visit
       const last = lastByMember[String(m.id)];
       if(!last) return false; // never checked in → no clock to start
       return (Date.now()-new Date(last+"T00:00:00").getTime()) >= cutoffMs;
@@ -11708,7 +11744,7 @@ function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visit
                         <TD>{m.phone||<span style={{color:MU}}>—</span>}</TD>
                         <TD>{m.email||<span style={{color:MU}}>—</span>}</TD>
                         <TD>{m.role||"Member"}</TD>
-                        <TD><ActBtns p={m}/></TD>
+                        <TD><div style={{display:"flex",gap:6,alignItems:"center"}}><ActBtns p={m}/><button onClick={()=>sendToFollowUp(m)} title="Send to Visitation → Pastor Visit" style={{padding:"4px 9px",borderRadius:7,border:"1px solid "+N,background:N+"0d",color:N,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>→ Pastor Visit</button></div></TD>
                       </tr>
                     ))}
                   </tbody>
@@ -13111,7 +13147,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const _monCIs=(checkIns||[]).filter((c:any)=>c.ptype==="member"&&_isMonSvc(c.ename));
   const _lastByMem:Record<string,string>={}; _monCIs.forEach((c:any)=>{const k=String(c.pid);const d=String(c.date||"");if(!d)return;if(!_lastByMem[k]||d>_lastByMem[k])_lastByMem[k]=d;});
   const _absCut=4*7*24*60*60*1000;
-  const absentMembers=_monCIs.length===0?[]:(members||[]).filter((m:any)=>{if(m.status!=="Active")return false;const last=_lastByMem[String(m.id)];if(!last)return false;return (Date.now()-new Date(last+"T00:00:00").getTime())>=_absCut;});
+  const absentMembers=_monCIs.length===0?[]:(members||[]).filter((m:any)=>{if(m.status!=="Active")return false;if(m.inFollowUp)return false;const last=_lastByMem[String(m.id)];if(!last)return false;return (Date.now()-new Date(last+"T00:00:00").getTime())>=_absCut;});
   const _pmNow=new Date(); const _prevMo=_pmNow.getMonth()===0?11:_pmNow.getMonth()-1; const _prevYr=_pmNow.getMonth()===0?_pmNow.getFullYear()-1:_pmNow.getFullYear();
   const _pmStart=new Date(_prevYr,_prevMo,1).toISOString().split("T")[0]; const _pmEnd=new Date(_prevYr,_prevMo+1,0).toISOString().split("T")[0];
   const _pmG=(giving||[]).filter((g:any)=>g.date>=_pmStart&&g.date<=_pmEnd);
@@ -13343,7 +13379,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="email" && <EmailCenter emailLog={emailLog} setEmailLog={setEmailLog} emailTemplates={emailTemplates} setEmailTemplates={setEmailTemplates} emailConfig={emailConfig} setEmailConfig={setEmailConfig} members={members} visitors={visitors} cs={churchSettings} onCompose={()=>openEmailComposer({})} onBulkCompose={()=>openBulkEmailComposer({recipients:members.filter(m=>m.email).map(m=>({name:m.first+" "+m.last,first:m.first,last:m.last,email:m.email}))})}/>}
           {!isMemberPortal && view==="access" && <Access members={members} users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} permissions={permissions} setPermissions={setPermissions} portalMembers={portalMembers} setPortalMembers={setPortalMembers} currentUser={currentUser} churchId={churchId}/>}
           {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile}/>}
-          {!isMemberPortal && isAdminUser && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords}/>}
+          {!isMemberPortal && isAdminUser && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords} setMembers={setMembers} setVisitors={setVisitors} setVisitRecords={setVisitRecords} activeCampusId={activeCampusId} setView={setView}/>}
           {!isMemberPortal && isAdminUser && view==="adminnotes" && <AdminNotes notes={adminNotesAll} readIds={adminNotesRead} setReadIds={setAdminNotesRead} campuses={campuses} activeCampusId={activeCampusId}/>}
           {!isMemberPortal && view==="manual" && <ManualPage/>}
         </div>
