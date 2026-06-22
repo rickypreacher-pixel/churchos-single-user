@@ -11561,15 +11561,22 @@ function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visit
   const sms  = (p:any) => { if(p.phone)(window as any).__openSmsComposer__?.({to:p.phone, toName:p.first+" "+p.last}); else alert("No phone on file."); };
   const email= (p:any) => { if(p.email)(window as any).__openEmailComposer__?.({to:p.email, toName:p.first+" "+p.last}); else alert("No email on file."); };
 
-  // ── TAB 1: Members missing 4 consecutive Sunday Morning services ──
+  // ── TAB 1: Members 4+ weeks with no check-in to ANY of the three monitored services ──
+  // Monitors Sunday Morning, Sunday Night, and Thursday Worship. Per-person clock that resets when
+  // they check in to any of the three. Members who have never checked in are not flagged.
   const absentMembers = (() => {
-    const sunCIs = (checkIns||[]).filter((c:any)=>c.ename&&c.ename.toLowerCase().includes("sunday morning")&&c.ptype==="member");
-    const sunDates = [...new Set(sunCIs.map((c:any)=>c.date))].sort().reverse();
-    const last4 = sunDates.slice(0,4);
-    if(last4.length<1) return [];
-    const presentPerDate:Record<string,Set<any>> = {};
-    last4.forEach(d=>{ presentPerDate[d]=new Set(sunCIs.filter((c:any)=>c.date===d).map((c:any)=>c.pid)); });
-    return (members||[]).filter((m:any)=>m.status==="Active"&&last4.length>0&&last4.every(d=>!presentPerDate[d]?.has(m.id)));
+    const isMon = (en:any)=>{ const s=String(en||"").toLowerCase(); return s.includes("sunday morning")||s.includes("sunday night")||s.includes("sunday evening")||s.includes("thursday"); };
+    const monCIs = (checkIns||[]).filter((c:any)=>c.ptype==="member"&&isMon(c.ename));
+    if(monCIs.length===0) return [];
+    const lastByMember:Record<string,string> = {};
+    monCIs.forEach((c:any)=>{ const k=String(c.pid); const d=String(c.date||""); if(!d) return; if(!lastByMember[k] || d>lastByMember[k]) lastByMember[k]=d; });
+    const cutoffMs = 4*7*24*60*60*1000; // 4 weeks
+    return (members||[]).filter((m:any)=>{
+      if(m.status!=="Active") return false;
+      const last = lastByMember[String(m.id)];
+      if(!last) return false; // never checked in → no clock to start
+      return (Date.now()-new Date(last+"T00:00:00").getTime()) >= cutoffMs;
+    });
   })();
 
   // ── TAB 2: Members who gave exactly 2 times in the previous month ──
@@ -11683,15 +11690,15 @@ function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visit
           <>
             <div style={{padding:"12px 16px",borderBottom:"0.5px solid "+BR,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <div style={{fontSize:14,fontWeight:600,color:N}}>Absent Members — 4 Consecutive Sundays</div>
-                <div style={{fontSize:12,color:MU,marginTop:2}}>Active members not checked in to any of the last 4 Sunday Morning services</div>
+                <div style={{fontSize:14,fontWeight:600,color:N}}>Absent Members — 4+ Weeks</div>
+                <div style={{fontSize:12,color:MU,marginTop:2}}>Active members with no check-in to Sunday Morning, Sunday Night, or Thursday Worship in 4+ weeks</div>
               </div>
               <Btn onClick={()=>exportCSV([["Name","Phone","Email","Role"],
                 ...absentMembers.map((m:any)=>[m.first+" "+m.last,m.phone||"",m.email||"",m.role||"Member"])],
                 "absent-members.csv")} v="outline" style={{fontSize:12}}>Export CSV</Btn>
             </div>
             {absentMembers.length===0
-              ? <EmptyState msg="No absent members found — either no Sunday Morning check-in data yet, or all members attended within the last 4 Sundays."/>
+              ? <EmptyState msg="No absent members found — either no service check-in data yet, or all members have attended Sunday Morning, Sunday Night, or Thursday Worship within the last 4 weeks."/>
               : <table style={{width:"100%",borderCollapse:"collapse"}}>
                   <thead><tr>{TH("Name")}{TH("Phone")}{TH("Email")}{TH("Role")}{TH("Actions","120px")}</tr></thead>
                   <tbody>
@@ -13099,12 +13106,12 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const todayStr=new Date().toISOString().split('T')[0];
   const maintAlertCount = maintAlerts.overdue.length + maintAlerts.urgent.length + maintAlerts.warrantyExpired.length + maintAlerts.warrantyExpiringSoon.length + (supplies||[]).filter((s:any)=>s.maxQty>0&&s.quantity<=Math.round(s.maxQty*0.25)).length + (checkouts||[]).filter((c:any)=>c.status==='Out'&&c.expectedReturnDate&&c.expectedReturnDate<todayStr).length;
   // Alerts page badge counts
-  const _sunCIs=(checkIns||[]).filter((c:any)=>c.ename&&c.ename.toLowerCase().includes("sunday morning")&&c.ptype==="member");
-  const _sunDates=[...new Set(_sunCIs.map((c:any)=>c.date))].sort().reverse();
-  const _last4sun=_sunDates.slice(0,4);
-  const _sunPresent:Record<string,Set<any>>={};
-  _last4sun.forEach((d:string)=>{_sunPresent[d]=new Set(_sunCIs.filter((c:any)=>c.date===d).map((c:any)=>c.pid));});
-  const absentMembers=(members||[]).filter((m:any)=>m.status==="Active"&&_last4sun.length>0&&_last4sun.every((d:string)=>!_sunPresent[d]?.has(m.id)));
+  // Absent Members badge: members 4+ weeks with no check-in to any of the three monitored services.
+  const _isMonSvc=(en:any)=>{const s=String(en||"").toLowerCase();return s.includes("sunday morning")||s.includes("sunday night")||s.includes("sunday evening")||s.includes("thursday");};
+  const _monCIs=(checkIns||[]).filter((c:any)=>c.ptype==="member"&&_isMonSvc(c.ename));
+  const _lastByMem:Record<string,string>={}; _monCIs.forEach((c:any)=>{const k=String(c.pid);const d=String(c.date||"");if(!d)return;if(!_lastByMem[k]||d>_lastByMem[k])_lastByMem[k]=d;});
+  const _absCut=4*7*24*60*60*1000;
+  const absentMembers=_monCIs.length===0?[]:(members||[]).filter((m:any)=>{if(m.status!=="Active")return false;const last=_lastByMem[String(m.id)];if(!last)return false;return (Date.now()-new Date(last+"T00:00:00").getTime())>=_absCut;});
   const _pmNow=new Date(); const _prevMo=_pmNow.getMonth()===0?11:_pmNow.getMonth()-1; const _prevYr=_pmNow.getMonth()===0?_pmNow.getFullYear()-1:_pmNow.getFullYear();
   const _pmStart=new Date(_prevYr,_prevMo,1).toISOString().split("T")[0]; const _pmEnd=new Date(_prevYr,_prevMo+1,0).toISOString().split("T")[0];
   const _pmG=(giving||[]).filter((g:any)=>g.date>=_pmStart&&g.date<=_pmEnd);
