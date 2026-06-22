@@ -775,7 +775,7 @@ async function downloadApp(cs, d) {
   const section = (title,color,content) => `<div class="section"><div class="sec-header" style="border-left:4px solid ${color}">${title}</div>${content}</div>`;
   const table = (headers,rows) => `<table><thead>${hrow(...headers)}</thead><tbody>${rows.join("")}</tbody></table>`;
 
-  const activeM = (d.members||[]).filter(m=>m.status==="Active").length;
+  const activeM = (d.members||[]).filter(m=>m.status==="Active"&&!m.inFollowUp).length;
   const totalGiving = (d.giving||[]).reduce((a,g)=>a+(+g.amount||0),0);
   const openWOs = (d.workOrders||[]).filter(w=>w.status!=="Completed").length;
   const overdueMaint = (d.schedMaint||[]).filter(s=>s.active&&s.nextService&&s.nextService<new Date().toISOString().split("T")[0]).length;
@@ -5617,7 +5617,7 @@ function Dashboard({members,visitors,attendance,giving,prayers,setView,canViewGi
   const monthLabel = new Date().toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const totalG = giving.filter((g:any)=>g.date.startsWith(nowYM)).reduce((a:number,g:any)=>a+g.amount,0);
   const lastSvc = attendance[0];
-  const activeM = members.filter((m:any)=>m.status==="Active").length;
+  const activeM = members.filter((m:any)=>m.status==="Active"&&!m.inFollowUp).length;
   const fu = visitors.filter((v:any)=>v.stage==="Follow-Up Needed").length;
 
   const genInsight = async () => {
@@ -5654,7 +5654,7 @@ function Dashboard({members,visitors,attendance,giving,prayers,setView,canViewGi
         <div style={{color:"#fff",fontSize:28,opacity:0.5}}>→</div>
       </div>}
       <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
-        <Stat label="Active Members" value={activeM} sub={"of "+members.length+" total"}/>
+        <Stat label="Active Members" value={activeM} sub={"of "+members.filter((m:any)=>!m.inFollowUp).length+" total"}/>
         <Stat label="Visitors" value={visitors.length} sub={fu+" need follow-up"} color={AM}/>
         <Stat label="Last Service" value={lastSvc?lastSvc.count:0} sub={lastSvc?lastSvc.service:""} color={BL}/>
         {canViewGiving && <Stat label={monthLabel+" Giving"} value={f$(totalG)} sub="Tithes and offerings" color={GR}/>}
@@ -12045,6 +12045,8 @@ function ManualPage(){
     {id:'s17',label:'20. Backup & Restore'},{id:'s18',label:'21. Maintenance'},{id:'s19',label:'22. Printer Setup'},
     {id:'s20',label:'23. Member Portal'},
     {id:'s24',label:'24. Multi-Campus'},
+    {id:'s25',label:'25. Admin Notes'},{id:'s26',label:'26. Audit Log'},
+    {id:'s27',label:'27. Stopped-Attending Follow-Up'},{id:'s28',label:'28. Youth Ministry Roll Call'},
   ];
   const H=({id,children}:any)=><h2 ref={setRef(id)} style={{fontSize:17,fontWeight:600,color:N,margin:'0 0 14px',paddingBottom:10,borderBottom:'2px solid '+G}}>{children}</h2>;
   const H3=({children}:any)=><h3 style={{fontSize:13,fontWeight:600,color:N,margin:'18px 0 8px',textTransform:'uppercase',letterSpacing:0.4}}>{children}</h3>;
@@ -12071,7 +12073,7 @@ function ManualPage(){
         <div style={{background:N,borderRadius:12,padding:'20px 24px',marginBottom:20}}>
           <div style={{color:'#fff',fontSize:21,fontWeight:600,letterSpacing:0.3}}>ChurchOS Staff Manual</div>
           <div style={{color:G,fontSize:13,marginTop:4}}>New Testament Christian Church — Administrator Guide</div>
-          <div style={{color:'#7a9acc',fontSize:12,marginTop:6}}>Version 6.5 · May 2026 · For internal staff use</div>
+          <div style={{color:'#7a9acc',fontSize:12,marginTop:6}}>Version 6.6 · June 2026 · For internal staff use</div>
         </div>
 
         <Sec><H id="s1">1. Getting Started</H>
@@ -12550,8 +12552,46 @@ function ManualPage(){
           <Note>Members and records created before multi-campus was configured default to <B>campus_main</B> (the original primary campus). They will appear when the first campus or <B>All</B> is selected, and can be reassigned using the bulk or individual campus tools.</Note>
         </Sec>
 
+        <Sec><H id="s25">25. Admin Notes</H>
+          <P>The <B>Admin Notes</B> page (under <B>Tools → 📝 Admin Notes</B>) gathers <B>every free-text note from across the whole system</B> into one place, so nothing written anywhere gets missed. A red badge on the sidebar shows how many notes are still unread.</P>
+          <Warn>Admin Notes is restricted to the <B>Super Admin</B> and the <B>Administrator</B> role only.</Warn>
+          <H3>What Shows Up</H3>
+          <Ul><Li>Member &amp; visitor profile notes</Li><Li>Visitation contact logs (every call/text/visit note)</Li><Li>Sick &amp; hospital visit notes</Li><Li>Group meeting notes and prayer requests</Li><Li>Education progress notes and counseling notes</Li></Ul>
+          <H3>Reading &amp; Checking Off</H3>
+          <Ol><Li>Each note shows a colored source tag, the person it relates to, the date, and the full text — newest first</Li><Li>Click a note's <B>checkbox</B> when you've read it; it is marked read and <B>disappears</B> from the list</Li><Li>Checking a note <B>never deletes or changes the original</B> — it only clears it from this page</Li><Li>Use the source filter pills to view one type at a time; click <B>Show read</B> to bring back and un-check notes</Li></Ol>
+          <Note>Notes are <B>tagged by campus</B> and the page respects the active campus filter (with a 🏛 campus badge in "All" view). Read state is shared and synced; an edited note reappears as unread. Auto-generated system entries are filtered out.</Note>
+        </Sec>
+
+        <Sec><H id="s26">26. Audit Log</H>
+          <P>The <B>Audit Log</B> (under <B>Tools → 📋 Audit Log</B>) records <B>who added, edited, or deleted records</B> across ChurchOS — a running history for accountability.</P>
+          <Warn>The Audit Log is restricted to the <B>Super Admin</B> and the <B>Administrator</B> role only.</Warn>
+          <H3>What It Captures</H3>
+          <Ul><Li>Creates, updates, and deletes of members, visitors, prospects, children, users, roles, groups, giving, and more</Li><Li>The acting user, the action, the record affected, and the date &amp; time</Li><Li>Large bulk changes (e.g. an import) are collapsed into a single summary row</Li></Ul>
+          <H3>Using It</H3>
+          <Ol><Li>Filter by <B>date</B> or <B>action</B>, or use the <B>search</B> box to find a person or record</Li><Li>Click <B>Export CSV</B> to download the log for board records or review</Li></Ol>
+          <Note>Entries are recorded when your changes sync to the cloud, so the log captures changes made from this point forward (it compares each save against the last synced version).</Note>
+        </Sec>
+
+        <Sec><H id="s27">27. Stopped-Attending Follow-Up</H>
+          <P>ChurchOS flags members who have stopped attending and lets you move them into the Visitation pipeline in one click.</P>
+          <H3>Finding Them</H3>
+          <P>On the <B>Alerts → Absent Members</B> tab, ChurchOS lists active members who have gone <B>4+ weeks with no check-in to any of the three monitored services</B> — <B>Sunday Morning, Sunday Night, or Thursday Worship</B>. It's a per-person clock that resets the moment they check in to any of the three; members who have never checked in are not flagged.</P>
+          <Warn>The Alerts page is restricted to the <B>Super Admin</B> and the <B>Administrator</B> role only.</Warn>
+          <H3>Sending to Pastor Visit</H3>
+          <Ol><Li>Each absent member has a <B>→ Pastor Visit</B> button</Li><Li>Clicking it moves that member <B>(and their household)</B> into <B>Visitation → Pastor Visit</B>, creating a returning-visitor follow-up tagged to their campus</Li><Li>They are <B>hidden from the Members directory</B> (and the alert) until they re-engage, so they don't appear in two places</Li></Ol>
+          <H3>Bringing Them Back</H3>
+          <P>In <B>Visitation</B>, open their follow-up and click <B>Convert to Member</B> — for a returning member this <B>restores their original member record</B> (no duplicate) and closes the follow-up.</P>
+        </Sec>
+
+        <Sec><H id="s28">28. Youth Ministry Roll Call</H>
+          <P>The <B>Education → Roll Call</B> page has a <B>Youth Ministry</B> tab (beside the classroom tabs) for taking attendance of your young adults.</P>
+          <H3>Who Appears</H3>
+          <Ul><Li>The roster is drawn from your <B>Members directory</B> — every <B>active member age 19–22</B>, by their real birthdate</Li><Li>Attendance is recorded against the <B>Young Adult classroom</B>, alongside the children's classes</Li><Li>The list is <B>self-maintaining</B> as members have birthdays and move into or out of the 19–22 range</Li></Ul>
+          <Note>Only members who have a <B>birthday on file</B> appear here, since the 19–22 range is calculated from their date of birth.</Note>
+        </Sec>
+
         <div style={{textAlign:'center',padding:'24px 0 8px',borderTop:'0.5px solid '+BR,marginTop:4}}>
-          <div style={{fontSize:12,color:MU}}>ChurchOS Staff Manual · New Testament Christian Church · Version 6.5 · May 2026</div>
+          <div style={{fontSize:12,color:MU}}>ChurchOS Staff Manual · New Testament Christian Church · Version 6.6 · June 2026</div>
           <div style={{fontSize:11,color:MU,marginTop:4}}>For technical support or feature requests, contact your system administrator.</div>
         </div>
       </div>
