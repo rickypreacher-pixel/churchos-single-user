@@ -10382,8 +10382,14 @@ function ClassRollCall({classrooms,children,rollCalls,setRollCalls,teacherSchedu
   const [selClassId,setSelClassId]=useState((classrooms.find((c:any)=>c.id<=6)||classrooms[0])?.id||0);
   const [notes,setNotes]=useState("");
   const [saved,setSaved]=useState(false);
+  const YOUTH_CID=7; // "Youth Ministry" tab — roll call recorded against the Young Adult classroom (id 7)
+  const isYouth=selClassId===YOUTH_CID;
   const selClass=classrooms.find((c:any)=>c.id===selClassId);
-  const roster=children.filter((c:any)=>c.status==="Active"&&c.grade===selClass?.grade);
+  const className=isYouth?"Youth Ministry":selClass?.name;
+  // Youth Ministry roster: active members ages 19–22 from the Members directory (by real birthdate).
+  const youthAge=(m:any)=>{const raw=String(m?.dob||m?.birthday||"").slice(0,10);if(!/^(19|20)\d\d-\d\d-\d\d$/.test(raw))return null;const a=calcAge(raw);return typeof a==="number"?a:null;};
+  const youthRoster=(((members as any[])||[]).map((m:any)=>({m,age:youthAge(m)})).filter((x:any)=>x.m&&x.m.status!=="Inactive"&&x.m.status!=="Archived"&&x.age!=null&&x.age>=19&&x.age<=22).map((x:any)=>({id:x.m.id,first:x.m.first,last:x.m.last,dob:String(x.m.dob||x.m.birthday||"").slice(0,10),parentName:"",parentPhone:x.m.phone||x.m.cell||x.m.mobile||""})).sort((a:any,b:any)=>((a.first||"")+(a.last||"")).localeCompare((b.first||"")+(b.last||""))));
+  const roster=isYouth?youthRoster:children.filter((c:any)=>c.status==="Active"&&c.grade===selClass?.grade);
   const existing=rollCalls.find((r:any)=>r.date===selDate&&r.classroomId===selClassId);
   useEffect(()=>{setNotes((rollCalls.find((r:any)=>r.date===selDate&&r.classroomId===selClassId) as any)?.teacherNotes||"");},[selDate,selClassId]);
   const getStatus=(childId:any)=>(existing as any)?.entries?.find((e:any)=>e.childId===childId)?.status||"";
@@ -10418,9 +10424,9 @@ function ClassRollCall({classrooms,children,rollCalls,setRollCalls,teacherSchedu
     <div>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"flex-end"}}>
         <div><div style={{fontSize:11,color:MU,marginBottom:4,fontWeight:500,textTransform:"uppercase" as any,letterSpacing:0.5}}>Date</div><input type="date" value={selDate} onChange={e=>setSelDate(e.target.value)} style={{padding:"7px 10px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none"}}/></div>
-        <div style={{flex:1}}><div style={{fontSize:11,color:MU,marginBottom:4,fontWeight:500,textTransform:"uppercase" as any,letterSpacing:0.5}}>Classroom</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(classrooms as any[]).filter((cl:any)=>cl.id<=6).map((cl:any)=><button key={cl.id} onClick={()=>setSelClassId(cl.id)} style={{padding:"7px 12px",borderRadius:7,border:"1.5px solid "+(selClassId===cl.id?cl.color:BR),background:selClassId===cl.id?cl.color+"14":W,color:selClassId===cl.id?cl.color:TX,fontSize:12,fontWeight:selClassId===cl.id?600:400,cursor:"pointer"}}>{cl.name}</button>)}</div></div>
+        <div style={{flex:1}}><div style={{fontSize:11,color:MU,marginBottom:4,fontWeight:500,textTransform:"uppercase" as any,letterSpacing:0.5}}>Classroom</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(classrooms as any[]).filter((cl:any)=>cl.id<=6).map((cl:any)=><button key={cl.id} onClick={()=>setSelClassId(cl.id)} style={{padding:"7px 12px",borderRadius:7,border:"1.5px solid "+(selClassId===cl.id?cl.color:BR),background:selClassId===cl.id?cl.color+"14":W,color:selClassId===cl.id?cl.color:TX,fontSize:12,fontWeight:selClassId===cl.id?600:400,cursor:"pointer"}}>{cl.name}</button>)}{(()=>{const yc=(classrooms as any[]).find((c:any)=>c.id===YOUTH_CID);const col=yc?.color||"#d97706";return <button key="youth" onClick={()=>setSelClassId(YOUTH_CID)} style={{padding:"7px 12px",borderRadius:7,border:"1.5px solid "+(isYouth?col:BR),background:isYouth?col+"14":W,color:isYouth?col:TX,fontSize:12,fontWeight:isYouth?600:400,cursor:"pointer"}}>Youth Ministry</button>;})()}</div></div>
       </div>
-      {selClass&&(<div>
+      {(selClass||isYouth)&&(<div>
         <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
           <div style={{background:W,border:"0.5px solid "+BR,borderRadius:10,padding:"10px 16px",flex:2,minWidth:140}}><div style={{fontSize:10,color:MU,textTransform:"uppercase" as any,letterSpacing:0.5}}>Lead Teacher</div><div style={{fontSize:13,fontWeight:500,color:N,marginTop:3}}>{leadM?(leadM as any).first+" "+(leadM as any).last:"Not assigned"}</div></div>
           <div style={{background:"#dcfce7",border:"0.5px solid #86efac",borderRadius:10,padding:"10px 16px",flex:1,minWidth:70,textAlign:"center" as any}}><div style={{fontSize:10,color:MU,textTransform:"uppercase" as any,letterSpacing:0.5}}>Present</div><div style={{fontSize:22,fontWeight:700,color:GR}}>{presentN}</div></div>
@@ -10428,10 +10434,10 @@ function ClassRollCall({classrooms,children,rollCalls,setRollCalls,teacherSchedu
           <div style={{background:"#fef3c7",border:"0.5px solid #fde68a",borderRadius:10,padding:"10px 16px",flex:1,minWidth:70,textAlign:"center" as any}}><div style={{fontSize:10,color:MU,textTransform:"uppercase" as any,letterSpacing:0.5}}>Excused</div><div style={{fontSize:22,fontWeight:700,color:AM}}>{excusedN}</div></div>
         </div>
         {roster.length===0?(
-          <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:36,textAlign:"center" as any}}><div style={{fontSize:13,fontWeight:500,color:N,marginBottom:6}}>No children in {(selClass as any).name}</div><div style={{fontSize:12,color:MU}}>Go to the Children tab and set their level to "{(selClass as any).name}" to add them here.</div></div>
+          <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:36,textAlign:"center" as any}}>{isYouth?(<><div style={{fontSize:13,fontWeight:500,color:N,marginBottom:6}}>No members age 19–22</div><div style={{fontSize:12,color:MU}}>Youth Ministry lists active members ages 19–22 from your Members directory. Add birthdates to members so they appear here.</div></>):(<><div style={{fontSize:13,fontWeight:500,color:N,marginBottom:6}}>No children in {(selClass as any).name}</div><div style={{fontSize:12,color:MU}}>Go to the Children tab and set their level to "{(selClass as any).name}" to add them here.</div></>)}</div>
         ):(
           <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,overflow:"hidden",marginBottom:14}}>
-            <div style={{padding:"10px 16px",background:"#f8f9fc",borderBottom:"0.5px solid "+BR,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,fontWeight:500,color:N}}>{(selClass as any).name} Roll Call — {fd(selDate)}</div><div style={{fontSize:11,color:MU}}>{roster.length} on roster</div></div>
+            <div style={{padding:"10px 16px",background:"#f8f9fc",borderBottom:"0.5px solid "+BR,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontSize:13,fontWeight:500,color:N}}>{className} Roll Call — {fd(selDate)}</div><div style={{fontSize:11,color:MU}}>{roster.length} on roster</div></div>
             {(roster as any[]).map((ch:any)=>{const st=getStatus(ch.id);return(
               <div key={ch.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"0.5px solid "+BR+"66"}}>
                 <Av f={ch.first} l={ch.last} sz={34}/>
