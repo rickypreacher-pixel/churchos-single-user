@@ -13039,7 +13039,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     {id:"access",label:"Access Control",icon:"Ac"},
     {id:"ai",label:"AI Assistant",icon:"AI"},
     {id:"settings",label:"Settings",icon:"⚙"},
-    {id:"alerts",label:"Alerts",icon:"🔔"},
+    ...(isAdminUser ? [{id:"alerts",label:"Alerts",icon:"🔔"}] : []),
     ...(isAdminUser ? [{id:"adminnotes",label:"Admin Notes",icon:"📝"}] : []),
     {id:"manual",label:"Manual",icon:"📖"},
   ];
@@ -13319,7 +13319,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="email" && <EmailCenter emailLog={emailLog} setEmailLog={setEmailLog} emailTemplates={emailTemplates} setEmailTemplates={setEmailTemplates} emailConfig={emailConfig} setEmailConfig={setEmailConfig} members={members} visitors={visitors} cs={churchSettings} onCompose={()=>openEmailComposer({})} onBulkCompose={()=>openBulkEmailComposer({recipients:members.filter(m=>m.email).map(m=>({name:m.first+" "+m.last,first:m.first,last:m.last,email:m.email}))})}/>}
           {!isMemberPortal && view==="access" && <Access members={members} users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} permissions={permissions} setPermissions={setPermissions} portalMembers={portalMembers} setPortalMembers={setPortalMembers} currentUser={currentUser} churchId={churchId}/>}
           {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile}/>}
-          {!isMemberPortal && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords}/>}
+          {!isMemberPortal && isAdminUser && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords}/>}
           {!isMemberPortal && isAdminUser && view==="adminnotes" && <AdminNotes notes={adminNotesAll} readIds={adminNotesRead} setReadIds={setAdminNotesRead} campuses={campuses} activeCampusId={activeCampusId}/>}
           {!isMemberPortal && view==="manual" && <ManualPage/>}
         </div>
