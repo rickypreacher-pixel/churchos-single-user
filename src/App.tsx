@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './lib/supabase';
+import { diffAudit, collapseAudit } from './lib/auditDiff.js';
 
 // ── MAINTENANCE & EQUIPMENT ──
 const MAINT_CATS=["Audio","Video","HVAC","Vehicles","Electrical","Plumbing","Kitchen","Office","Musical Instruments","Grounds/Landscaping","Other"];
@@ -11463,6 +11464,83 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
 }
 
 // ── ALERTS PAGE ──
+// ── AUDIT LOG ── admin-only history of who added/edited/deleted records, read from the audit_log
+// table. Rows are written at the cloud-save chokepoint (recordAudit) by diffing the blob.
+function AuditLog({churchId}:any){
+  const [rows,setRows]=useState<any[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [err,setErr]=useState("");
+  const [fromDate,setFromDate]=useState("");
+  const [toDate,setToDate]=useState("");
+  const [actFilter,setActFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const load=()=>{
+    setLoading(true);setErr("");
+    supabase.from('audit_log').select('id,user_name,user_email,action,entity,entity_label,created_at').eq('church_id',churchId).order('created_at',{ascending:false}).limit(2000)
+      .then(({data,error}:any)=>{ if(error) setErr(error.message||"Could not load the audit log."); setRows(data||[]); setLoading(false); });
+  };
+  useEffect(()=>{ if(churchId) load(); },[churchId]);
+  const fmt=(ts:string)=>{ try{ const d=new Date(ts); return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"})+" · "+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }catch{ return ts; } };
+  const localDay=(ts:string)=>{ try{ return new Date(ts).toLocaleDateString("en-CA"); }catch{ return (ts||"").slice(0,10); } };
+  const filtered=rows.filter((r:any)=>{
+    const d=localDay(r.created_at); if(fromDate&&d<fromDate)return false; if(toDate&&d>toDate)return false;
+    if(actFilter!=="all" && r.action!==actFilter) return false;
+    if(search){ const q=search.toLowerCase(); if(!((r.user_name||"")+" "+(r.user_email||"")+" "+(r.entity||"")+" "+(r.entity_label||"")).toLowerCase().includes(q)) return false; }
+    return true;
+  });
+  const exportCsv=()=>{
+    const esc=(s:any)=>{ const v=String(s??""); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+    const lines=[["User","Email","Action","Type","Item","Date & Time"].join(",")].concat(filtered.map((r:any)=>[esc(r.user_name||""),esc(r.user_email||""),esc(r.action||""),esc(r.entity||""),esc(r.entity_label||""),esc(fmt(r.created_at))].join(",")));
+    const blob=new Blob([lines.join("\n")],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob); const a=document.createElement("a");
+    a.href=url; a.download="audit-log"+((fromDate||toDate)?"_"+(fromDate||"start")+"_to_"+(toDate||"now"):"")+".csv";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const ACT:any={created:{bg:"#dcfce7",c:GR,label:"Created"},updated:{bg:"#dbeafe",c:"#1d4ed8",label:"Updated"},deleted:{bg:"#fee2e2",c:RE,label:"Deleted"}};
+  const th:any={textAlign:"left",padding:"10px 14px",fontSize:11,color:MU,textTransform:"uppercase",letterSpacing:0.4,fontWeight:600};
+  const tdS:any={padding:"10px 14px",fontSize:13,borderTop:"0.5px solid "+BR,verticalAlign:"top"};
+  const dateInput:any={padding:"5px 8px",border:"0.5px solid "+BR,borderRadius:6,fontSize:12,outline:"none",background:W};
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:12}}>
+        <div>
+          <h3 style={{fontSize:15,fontWeight:500,color:N,margin:0}}>Audit Log</h3>
+          <div style={{fontSize:12,color:MU,marginTop:2}}>Who added, edited, or deleted records — newest first. Visible to administrators only.</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
+          <label style={{fontSize:10,color:MU,display:"flex",flexDirection:"column" as any,gap:2}}>From<input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={dateInput}/></label>
+          <label style={{fontSize:10,color:MU,display:"flex",flexDirection:"column" as any,gap:2}}>To<input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={dateInput}/></label>
+          <label style={{fontSize:10,color:MU,display:"flex",flexDirection:"column" as any,gap:2}}>Action<select value={actFilter} onChange={e=>setActFilter(e.target.value)} style={dateInput}><option value="all">All</option><option value="created">Created</option><option value="updated">Updated</option><option value="deleted">Deleted</option></select></label>
+          {(fromDate||toDate||actFilter!=="all")&&<button onClick={()=>{setFromDate("");setToDate("");setActFilter("all");}} style={{background:"none",border:"0.5px solid "+BR,borderRadius:6,padding:"6px 10px",fontSize:12,cursor:"pointer",color:MU}}>Clear</button>}
+          <Btn onClick={exportCsv} v="ghost" style={{fontSize:12}}>⬇ Export CSV</Btn>
+          <Btn onClick={load} v="ghost" style={{fontSize:12}}>↻ Refresh</Btn>
+        </div>
+      </div>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by user, type, or item..." style={{width:"100%",maxWidth:360,padding:"7px 12px",border:"0.5px solid "+BR,borderRadius:8,fontSize:13,outline:"none",marginBottom:12}}/>
+      {loading ? <div style={{padding:24,color:MU,fontSize:13}}>Loading…</div>
+        : err ? <div style={{background:"#fef2f2",border:"0.5px solid "+RE+"44",borderRadius:8,padding:"12px 14px",color:RE,fontSize:13}}>{err}</div>
+        : rows.length===0 ? <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:32,textAlign:"center" as any,color:MU,fontSize:13}}>No changes recorded yet. Adds, edits, and deletes will appear here.</div>
+        : (
+          <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",fontSize:12,color:MU,borderBottom:"0.5px solid "+BR,background:BG}}>{filtered.length} change{filtered.length!==1?"s":""}{(fromDate||toDate||actFilter!=="all"||search)?" matching · of "+rows.length+" total":" recorded"}</div>
+            {filtered.length===0
+              ? <div style={{padding:24,textAlign:"center" as any,color:MU,fontSize:13}}>No changes match your filters.</div>
+              : <table style={{width:"100%",borderCollapse:"collapse" as any}}>
+                  <thead><tr><th style={th}>User</th><th style={th}>Action</th><th style={th}>What</th><th style={th}>Date &amp; Time</th></tr></thead>
+                  <tbody>{filtered.map((r:any)=>{const a=ACT[r.action]||{bg:BG,c:MU,label:r.action};return(
+                    <tr key={r.id}>
+                      <td style={{...tdS,fontWeight:500}}>{r.user_name||"—"}{r.user_email?<div style={{fontSize:11,color:MU,fontWeight:400}}>{r.user_email}</div>:null}</td>
+                      <td style={tdS}><span style={{fontSize:11,fontWeight:600,background:a.bg,color:a.c,borderRadius:10,padding:"2px 9px"}}>{a.label}</span></td>
+                      <td style={tdS}><span style={{color:MU,textTransform:"capitalize" as any}}>{r.entity}</span> · <span style={{fontWeight:500}}>{r.entity_label||"—"}</span></td>
+                      <td style={{...tdS,whiteSpace:"nowrap" as any}}>{fmt(r.created_at)}</td>
+                    </tr>);})}</tbody>
+                </table>}
+          </div>
+        )}
+    </div>
+  );
+}
+
 // ── ADMIN NOTES ── aggregates every free-text note across the system into one admin-only feed,
 // tagged by campus. Read-state (adminNotesRead) is a shared list synced in the church_data blob.
 // A note's id embeds a content hash, so an edited note resurfaces as unread.
@@ -12900,6 +12978,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const cloudHasData = (Array.isArray(d.members)&&d.members.length>0)||(Array.isArray(d.visitors)&&d.visitors.length>0)||(Array.isArray(d.giving)&&d.giving.length>0)||(Array.isArray(d.attendance)&&d.attendance.length>0);
       const localHasData = members.length>0||visitors.length>0||giving.length>0||attendance.length>0;
       if(!cloudHasData && localHasData) return; // cloud is empty but we have local data — don't overwrite
+      lastAuditedBlob.current = d; // audit baseline = the blob we just loaded
       if(Array.isArray(d.adminNotesRead)) setAdminNotesRead(d.adminNotesRead);
       if(Array.isArray(d.members)&&d.members.length) setMembers(d.members);
       if(Array.isArray(d.visitors)&&d.visitors.length) setVisitors(d.visitors);
@@ -12968,6 +13047,24 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     return()=>{ clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   },[churchId]);
 
+  // ── Audit log: capture the signed-in user's id, and diff base→next at the save chokepoint ──
+  const authUid = useRef<any>(null);
+  const lastAuditedBlob = useRef<any>(null); // the blob this device last loaded/saved (audit baseline)
+  useEffect(()=>{ supabase.auth.getSession().then(({data}:any)=>{ authUid.current = data?.session?.user?.id || null; }).catch(()=>{}); },[]);
+  const recordAudit = (base:any, next:any) => {
+    try {
+      if(!base || !authUid.current || !churchId) return; // no baseline (first load) → nothing to diff
+      const changes = collapseAudit(diffAudit(base, next));
+      if(!changes.length) return;
+      const uname = [adminFirst,adminLast].filter(Boolean).join(' ').trim() || displayName || loggedInEmail || 'Unknown';
+      const auditRows = changes.slice(0,100).map((c:any)=>({
+        church_id:churchId, user_id:authUid.current, user_name:uname, user_email:loggedInEmail||null,
+        action:c.action, entity:c.entity, entity_id:c.entity_id??null, entity_label:c.entity_label??null,
+      }));
+      supabase.from('audit_log').insert(auditRows).then(()=>{},()=>{}); // fire-and-forget; never block the save
+    } catch {}
+  };
+
   // ── Debounced Supabase cloud-save (3 s after last change) ──
   useEffect(()=>{
     if(!churchId) return;
@@ -13006,7 +13103,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
       );
-      if(!error) lastSyncAt.current = Date.now();
+      if(!error){ lastSyncAt.current = Date.now(); recordAudit(lastAuditedBlob.current, blob); lastAuditedBlob.current = blob; }
       setCloudSync(error?'error':'saved');
       setTimeout(()=>setCloudSync('idle'),2500);
     },3000);
@@ -13101,6 +13198,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     {id:"settings",label:"Settings",icon:"⚙"},
     ...(isAdminUser ? [{id:"alerts",label:"Alerts",icon:"🔔"}] : []),
     ...(isAdminUser ? [{id:"adminnotes",label:"Admin Notes",icon:"📝"}] : []),
+    ...(isAdminUser ? [{id:"auditlog",label:"Audit Log",icon:"📋"}] : []),
     {id:"manual",label:"Manual",icon:"📖"},
   ];
   // Map nav IDs to MODULES keys for permission checking (null = always visible)
@@ -13111,7 +13209,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     visitation:"visitation", groups:"groups", education:"education",
     maintenance:"maintenance", calendar:"events", attendance:"attendance",
     giving:"giving", prayer:"prayer", email:null, sms:null,
-    access:"settings", ai:null, settings:"settings", alerts:null, adminnotes:null, manual:null,
+    access:"settings", ai:null, settings:"settings", alerts:null, adminnotes:null, auditlog:null, manual:null,
   };
   // For staff, hide nav items they don't have "view" permission for
   // Additionally, restricted staff (non-Admin/non-SuperAdmin) always have maintenance/ai/email/sms hidden
@@ -13134,7 +13232,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         });
         return staffMemberRecord ? [...filtered, {id:"myprofile",label:"My Profile",icon:"👤"}] : filtered;
       })();
-  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",volunteer:"Volunteer & Usher Scheduler",classes:"Classes & Leadership Training",sickvisit:"Hospital & Sick Visit Log",benevolence:"Benevolence Fund",hospitality:"Hospitality Account",counseling:"Pastoral Counseling Log",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",adminnotes:"Admin Notes",manual:"Staff Manual",myprofile:"My Profile"};
+  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",volunteer:"Volunteer & Usher Scheduler",classes:"Classes & Leadership Training",sickvisit:"Hospital & Sick Visit Log",benevolence:"Benevolence Fund",hospitality:"Hospitality Account",counseling:"Pastoral Counseling Log",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",adminnotes:"Admin Notes",auditlog:"Audit Log",manual:"Staff Manual",myprofile:"My Profile"};
   const pending = users.filter(u=>u.status==="Pending").length;
   const fu = visitors.filter(v=>v.stage==="Follow-Up Needed").length;
   const inVis = visitRecords.filter(r=>r.stage!=="Complete").length;
@@ -13381,6 +13479,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile}/>}
           {!isMemberPortal && isAdminUser && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords} setMembers={setMembers} setVisitors={setVisitors} setVisitRecords={setVisitRecords} activeCampusId={activeCampusId} setView={setView}/>}
           {!isMemberPortal && isAdminUser && view==="adminnotes" && <AdminNotes notes={adminNotesAll} readIds={adminNotesRead} setReadIds={setAdminNotesRead} campuses={campuses} activeCampusId={activeCampusId}/>}
+          {!isMemberPortal && isAdminUser && view==="auditlog" && <AuditLog churchId={churchId}/>}
           {!isMemberPortal && view==="manual" && <ManualPage/>}
         </div>
       </div>
