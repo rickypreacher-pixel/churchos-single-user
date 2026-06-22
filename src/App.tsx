@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 
 // ── MAINTENANCE & EQUIPMENT ──
@@ -11448,6 +11448,94 @@ function AddMemberPage({members,setMembers,visitors,setVisitors,currentUser,role
 }
 
 // ── ALERTS PAGE ──
+// ── ADMIN NOTES ── aggregates every free-text note across the system into one admin-only feed,
+// tagged by campus. Read-state (adminNotesRead) is a shared list synced in the church_data blob.
+// A note's id embeds a content hash, so an edited note resurfaces as unread.
+const _NOTE_AUTO_RE = /(Profile updated|Email Assimilations|Updated Volunteer Roster|Auto-logged|Auto - |sent on \d{4}|Checked in to )/i;
+function _noteHash(s:any){ let h=2166136261>>>0; const str=String(s||""); for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36); }
+function collectAdminNotes(ctx:any){
+  const { members=[], visitors=[], visitRecords=[], sickVisits=[], groups=[], grpMeetings=[], prayers=[], progressNotes=[], counselingLogs=[], children=[], users=[] } = ctx||{};
+  const out:any[] = [];
+  const arr = (x:any)=>Array.isArray(x)?x:[];
+  const find = (list:any[], id:any)=>list.find((x:any)=>String(x.id)===String(id));
+  const nm = (list:any[], id:any)=>{ const r=find(list,id); return r?((r.first||"")+" "+(r.last||"")).trim():""; };
+  const grpName = (id:any)=>{ const g=find(groups,id); return g?(g.name||""):""; };
+  const personName = (id:any,type:any)=> type==='visitor'?nm(visitors,id):nm(members,id);
+  const cmp = (rec:any)=> String(rec?.campus||'campus_main');
+  const push = (source:string, recordId:any, sub:any, text:any, who:any, date:any, meta:any, campus:any)=>{
+    const t=String(text||"").trim(); if(!t) return;
+    out.push({ id:source+":"+String(recordId)+":"+(sub??"")+":"+_noteHash(t), source, recordId:String(recordId), who:who||"", date:(date||"").slice(0,10), text:t, meta:meta||"", campus:campus||'campus_main' });
+  };
+  arr(members).forEach((m:any)=>{ const n=String(m?.notes||"").trim(); if(n && !_NOTE_AUTO_RE.test(n)) push("Member", m.id, "", n, ((m.first||"")+" "+(m.last||"")).trim(), "", "", cmp(m)); });
+  arr(visitors).forEach((v:any)=>{ const n=String(v?.notes||"").trim(); if(n && !_NOTE_AUTO_RE.test(n)) push("Visitor", v.id, "", n, ((v.first||"")+" "+(v.last||"")).trim(), v.firstVisit, "", cmp(v)); });
+  arr(visitRecords).forEach((r:any)=>{ arr(r?.contacts).forEach((c:any,i:number)=>{ const n=String(c?.notes||"").trim(); if(n) push("Visitation", r.id, "c"+(c.id??i), n, nm(visitors,r.visitorId), c.date, c.method, cmp(r)); }); });
+  arr(sickVisits).forEach((s:any)=>{ const n=String(s?.notes||"").trim(); if(n) push("Sick/Hospital", s.id, "", n, personName(s.personId,s.personType), s.visitDate, s.visitType, cmp(s)); });
+  arr(grpMeetings).forEach((g:any)=>{ const n=String(g?.notes||"").trim(); if(n && !_NOTE_AUTO_RE.test(n)) push("Group", g.id, "", n, grpName(g.groupId), g.date, "", cmp(g)); });
+  arr(prayers).forEach((p:any)=>{ const n=String(p?.request||p?.text||"").trim(); if(n) push("Prayer", p.id, "", n, p.name||p.requester||"", p.date, p.status, cmp(p)); });
+  arr(progressNotes).forEach((p:any)=>{ if(p?.auto || p?.source==='checkin') return; const n=String(p?.note||p?.notes||"").trim(); if(n) push("Progress", p.id, "", n, nm(children,p.childId), p.date, p.type, cmp(p)); });
+  arr(counselingLogs).forEach((l:any)=>{ const sn=String(l?.sessionNotes||l?.notes||"").trim(); const ai=String(l?.actionItems||"").trim(); const combined=[sn, ai?("Action items: "+ai):""].filter(Boolean).join(" — "); if(combined) push("Counseling", l.id, "", combined, personName(l.personId,l.personType), l.sessionDate, l.category, cmp(l)); });
+  out.sort((a:any,b:any)=> (b.date||"").localeCompare(a.date||""));
+  return out;
+}
+const _NOTE_SRC_COLOR:any = {Member:N, Visitor:AM, Visitation:BL, "Sick/Hospital":RE, Group:PU, Prayer:TE, Progress:GR, Counseling:"#be123c"};
+function AdminNotes({notes=[], readIds=[], setReadIds, campuses=[], activeCampusId='all'}:any){
+  const [showRead,setShowRead] = useState(false);
+  const [srcFilter,setSrcFilter] = useState("all");
+  const readSet = new Set((Array.isArray(readIds)?readIds:[]).map(String));
+  const campusName = (id:any)=>{ const c=(campuses||[]).find((x:any)=>String(x.id)===String(id)); return c?c.name:(id==='campus_main'?'Main Campus':String(id||'Main Campus')); };
+  const multiCampus = (campuses||[]).length>1;
+  const scoped = (notes||[]).filter((n:any)=> activeCampusId==='all' || String(n.campus)===String(activeCampusId));
+  const allSources = Array.from(new Set(scoped.map((n:any)=>n.source)));
+  const unread = scoped.filter((n:any)=>!readSet.has(String(n.id)));
+  const visible = scoped.filter((n:any)=> (showRead || !readSet.has(String(n.id))) && (srcFilter==="all"||n.source===srcFilter));
+  const setRead = (id:any, read:boolean)=>{ if(typeof setReadIds!=="function") return; setReadIds((prev:any)=>{ const a=Array.isArray(prev)?prev:[]; const s=new Set(a.map(String)); if(read) s.add(String(id)); else s.delete(String(id)); return Array.from(s); }); };
+  const fd2 = (d:string)=> d ? (()=>{ try{ const x=new Date(d+"T00:00:00"); return x.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }catch{ return d; } })() : "";
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginBottom:14}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:600,color:N}}>📝 Admin Notes</div>
+          <div style={{fontSize:12,color:MU,marginTop:2}}>Every note across the system in one place{multiCampus?" (respects the campus filter)":""}. Check a note to mark it read — it disappears. Checking never deletes the original note.</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{background:unread.length?RE:GR,color:"#fff",borderRadius:20,fontSize:12,fontWeight:600,padding:"3px 10px"}}>{unread.length} unread</span>
+          <button onClick={()=>setShowRead((s:boolean)=>!s)} style={{padding:"6px 12px",borderRadius:8,border:"1px solid "+BR,background:showRead?N:W,color:showRead?"#fff":TX,fontSize:12,fontWeight:500,cursor:"pointer"}}>{showRead?"Hiding read ✓":"Show read"}</button>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {["all",...allSources].map((s:any)=>(
+          <button key={s} onClick={()=>setSrcFilter(s)} style={{padding:"5px 11px",borderRadius:20,border:"1px solid "+(srcFilter===s?(s==="all"?N:(_NOTE_SRC_COLOR[s]||N)):BR),background:srcFilter===s?(s==="all"?N+"14":(_NOTE_SRC_COLOR[s]||N)+"14"):W,color:srcFilter===s?(s==="all"?N:(_NOTE_SRC_COLOR[s]||N)):MU,fontSize:12,fontWeight:srcFilter===s?600:400,cursor:"pointer"}}>{s==="all"?"All":s}{s!=="all"?" ("+scoped.filter((n:any)=>n.source===s&&!readSet.has(String(n.id))).length+")":""}</button>
+        ))}
+      </div>
+      {visible.length===0?(
+        <div style={{background:W,border:"0.5px solid "+BR,borderRadius:12,padding:40,textAlign:"center" as any}}>
+          <div style={{fontSize:32,marginBottom:8}}>✓</div>
+          <div style={{fontSize:14,fontWeight:500,color:N}}>{showRead?"No notes match this filter.":"All caught up — no unread notes."}</div>
+          {!showRead && unread.length===0 && <div style={{fontSize:12,color:MU,marginTop:4}}>New or edited notes will appear here automatically.</div>}
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column" as any,gap:8}}>
+          {visible.map((n:any)=>{ const isRead=readSet.has(String(n.id)); const col=_NOTE_SRC_COLOR[n.source]||N; return (
+            <div key={n.id} style={{display:"flex",gap:12,alignItems:"flex-start",background:W,border:"0.5px solid "+BR,borderRadius:12,padding:"12px 14px",opacity:isRead?0.6:1}}>
+              <button onClick={()=>setRead(n.id,!isRead)} title={isRead?"Mark unread":"Mark read"} style={{flexShrink:0,marginTop:1,width:22,height:22,borderRadius:6,border:"2px solid "+(isRead?GR:BR),background:isRead?GR:W,color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center"}}>{isRead?"✓":""}</button>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                  <span style={{background:col+"18",color:col,borderRadius:6,fontSize:10,fontWeight:700,padding:"2px 7px",textTransform:"uppercase" as any,letterSpacing:0.4}}>{n.source}</span>
+                  {n.who && <span style={{fontSize:13,fontWeight:600,color:N}}>{n.who}</span>}
+                  {multiCampus && <span style={{background:BG,color:MU,borderRadius:6,fontSize:10,fontWeight:600,padding:"2px 7px"}}>🏛 {campusName(n.campus)}</span>}
+                  {n.meta && <span style={{fontSize:11,color:MU}}>· {n.meta}</span>}
+                  {n.date && <span style={{fontSize:11,color:MU,marginLeft:"auto"}}>{fd2(n.date)}</span>}
+                </div>
+                <div style={{fontSize:13,color:TX,lineHeight:1.5,whiteSpace:"pre-wrap" as any,wordBreak:"break-word" as any}}>{n.text}</div>
+              </div>
+            </div>
+          );})}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AlertPage({members,visitors,giving,checkIns,kidsCheckIns,children,visitRecords}:any){
   const [tab,setTab] = useState(0);
   const TABS = ["Absent Members","Low Giving","Phone Directory","Absent Children","Birthdays","Outstanding Visits"];
@@ -12558,6 +12646,8 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   const [hospitalityFund,setHospitalityFund] = useState(lsGet('hospitalityFund') ?? []);
   const [hospStartBalance,setHospStartBalance] = useState(lsGet('hospStartBalance') ?? 0);
   const [counselingLogs,setCounselingLogs] = useState(lsGet('counselingLogs') ?? []);
+  // Admin Notes read-tracking — shared set of note ids checked off; synced in the church_data blob.
+  const [adminNotesRead,setAdminNotesRead] = useState(lsGet('adminNotesRead') ?? []);
   const [attendance,setAttendance] = useState(lsGet('attendance') ?? _I.attendance ?? []);
   const [giving,setGiving] = useState(lsGet('giving') ?? _I.giving ?? []);
   const [prayers,setPrayers] = useState(lsGet('prayers') ?? _I.prayers ?? []);
@@ -12736,6 +12826,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   useEffect(()=>{lsSave('hospitalityFund',hospitalityFund);},[JSON.stringify(hospitalityFund)]);
   useEffect(()=>{lsSave('hospStartBalance',hospStartBalance);},[hospStartBalance]);
   useEffect(()=>{lsSave('counselingLogs',counselingLogs);},[JSON.stringify(counselingLogs)]);
+  useEffect(()=>{lsSave('adminNotesRead',adminNotesRead);},[JSON.stringify(adminNotesRead)]);
 
   // ── Load from Supabase on mount — cloud is source of truth across devices ──
   useEffect(()=>{
@@ -12758,6 +12849,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
       const cloudHasData = (Array.isArray(d.members)&&d.members.length>0)||(Array.isArray(d.visitors)&&d.visitors.length>0)||(Array.isArray(d.giving)&&d.giving.length>0)||(Array.isArray(d.attendance)&&d.attendance.length>0);
       const localHasData = members.length>0||visitors.length>0||giving.length>0||attendance.length>0;
       if(!cloudHasData && localHasData) return; // cloud is empty but we have local data — don't overwrite
+      if(Array.isArray(d.adminNotesRead)) setAdminNotesRead(d.adminNotesRead);
       if(Array.isArray(d.members)&&d.members.length) setMembers(d.members);
       if(Array.isArray(d.visitors)&&d.visitors.length) setVisitors(d.visitors);
       if(Array.isArray(d.attendance)&&d.attendance.length) setAttendance(d.attendance);
@@ -12849,7 +12941,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
         emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
         progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses,
-        volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs};
+        volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs,adminNotesRead};
       const {error} = await supabase.from('church_data').upsert(
         {church_id:churchId,data:blob,updated_at:new Date().toISOString()},
         {onConflict:'church_id'}
@@ -12862,7 +12954,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     children,classrooms,equipment,workOrders,schedMaint,supplies,checkoutItems,checkouts,pledgeDrives,pledges,weeklyReports,
     emailLog,emailTemplates,emailConfig,recurring,custom,checkIns,incidents,rollCalls,
     progressNotes,teacherSchedule,kidsCheckIns,roles,permissions,churchSettings,users,prospects,campuses,
-    volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs})]);
+    volunteerSlots,classEnrollments,sickVisits,benevolence,hospitalityFund,hospStartBalance,counselingLogs,adminNotesRead})]);
 
   const nidEmail = useRef(8000);
   const logEmail = (data) => {
@@ -12918,6 +13010,11 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
   window.__openSmsComposer__ = openSmsComposer;
   window.__openBulkSmsComposer__ = openBulkSmsComposer;
 
+  const isAdminUser = !!(currentUser?.superAdmin || (currentUser?.roleId && roles.find((r:any)=>r.id===currentUser.roleId)?.name==="Administrator"));
+  // Admin Notes — aggregate every note (admins only); drives the page + the nav badge.
+  const adminNotesAll = useMemo(()=> isAdminUser ? collectAdminNotes({members,visitors,visitRecords,sickVisits,groups,grpMeetings,prayers,progressNotes,counselingLogs,children,users}) : [],
+    [isAdminUser,members,visitors,visitRecords,sickVisits,groups,grpMeetings,prayers,progressNotes,counselingLogs,children,users]);
+  const adminNotesUnread = useMemo(()=>{ const r=new Set((adminNotesRead||[]).map(String)); return adminNotesAll.filter((n:any)=>!r.has(String(n.id))).length; },[adminNotesAll,adminNotesRead]);
   const NAV = [
     {id:"dashboard",label:"Dashboard",icon:"D"},
     {id:"addperson",label:"Add Person",icon:"➕"},
@@ -12943,6 +13040,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     {id:"ai",label:"AI Assistant",icon:"AI"},
     {id:"settings",label:"Settings",icon:"⚙"},
     {id:"alerts",label:"Alerts",icon:"🔔"},
+    ...(isAdminUser ? [{id:"adminnotes",label:"Admin Notes",icon:"📝"}] : []),
     {id:"manual",label:"Manual",icon:"📖"},
   ];
   // Map nav IDs to MODULES keys for permission checking (null = always visible)
@@ -12953,7 +13051,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
     visitation:"visitation", groups:"groups", education:"education",
     maintenance:"maintenance", calendar:"events", attendance:"attendance",
     giving:"giving", prayer:"prayer", email:null, sms:null,
-    access:"settings", ai:null, settings:"settings", alerts:null, manual:null,
+    access:"settings", ai:null, settings:"settings", alerts:null, adminnotes:null, manual:null,
   };
   // For staff, hide nav items they don't have "view" permission for
   // Additionally, restricted staff (non-Admin/non-SuperAdmin) always have maintenance/ai/email/sms hidden
@@ -12976,7 +13074,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
         });
         return staffMemberRecord ? [...filtered, {id:"myprofile",label:"My Profile",icon:"👤"}] : filtered;
       })();
-  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",volunteer:"Volunteer & Usher Scheduler",classes:"Classes & Leadership Training",sickvisit:"Hospital & Sick Visit Log",benevolence:"Benevolence Fund",hospitality:"Hospitality Account",counseling:"Pastoral Counseling Log",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",manual:"Staff Manual",myprofile:"My Profile"};
+  const TITLES:any = {dashboard:"Dashboard",addperson:"Add Person to Database",people:"Members Profile",prospects:"Prospects",volunteer:"Volunteer & Usher Scheduler",classes:"Classes & Leadership Training",sickvisit:"Hospital & Sick Visit Log",benevolence:"Benevolence Fund",hospitality:"Hospitality Account",counseling:"Pastoral Counseling Log",visitation:"Visitation & Follow-Up",education:"Education Department",maintenance:"Maintenance & Equipment",attendance:"Attendance",giving:"Giving Records",prayer:"Prayer Wall",email:"Email Center",sms:"SMS Center",access:"Access Control",ai:"AI Assistant",settings:"Church Settings",alerts:"Alerts & Reports",adminnotes:"Admin Notes",manual:"Staff Manual",myprofile:"My Profile"};
   const pending = users.filter(u=>u.status==="Pending").length;
   const fu = visitors.filter(v=>v.stage==="Follow-Up Needed").length;
   const inVis = visitRecords.filter(r=>r.stage!=="Complete").length;
@@ -13027,6 +13125,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
             {item.id==="visitation"&&inVis>0&&<span style={{marginLeft:"auto",background:PU,color:"#fff",borderRadius:10,fontSize:10,fontWeight:600,padding:"1px 6px"}}>{inVis}</span>}
             {item.id==="maintenance"&&maintAlertCount>0&&<span style={{marginLeft:"auto",background:RE,color:"#fff",borderRadius:10,fontSize:10,fontWeight:600,padding:"1px 6px"}}>{maintAlertCount}</span>}
             {item.id==="alerts"&&(absentMembers.length+lowGivers.length+absentChildren.length+outstandingVisits.length)>0&&<span style={{marginLeft:"auto",background:RE,color:"#fff",borderRadius:10,fontSize:10,fontWeight:600,padding:"1px 6px"}}>{absentMembers.length+lowGivers.length+absentChildren.length+outstandingVisits.length}</span>}
+            {item.id==="adminnotes"&&adminNotesUnread>0&&<span style={{marginLeft:"auto",background:RE,color:"#fff",borderRadius:10,fontSize:10,fontWeight:600,padding:"1px 6px"}}>{adminNotesUnread}</span>}
           </button>
         ))}
       </div>
@@ -13221,6 +13320,7 @@ export default function App({churchId,churchName,adminFirst,adminLast,onSignOut,
           {!isMemberPortal && view==="access" && <Access members={members} users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} permissions={permissions} setPermissions={setPermissions} portalMembers={portalMembers} setPortalMembers={setPortalMembers} currentUser={currentUser} churchId={churchId}/>}
           {!isMemberPortal && view==="ai" && <AIAssist aiChat={aiChat} setAiChat={setAiChat} members={members} setMembers={setMembers} visitors={visitors} setVisitors={setVisitors} attendance={attendance} setAttendance={setAttendance} giving={giving} setGiving={setGiving} prayers={prayers} setView={setView} isMobile={isMobile}/>}
           {!isMemberPortal && view==="alerts" && <AlertPage members={members} visitors={visitors} giving={giving} checkIns={checkIns} kidsCheckIns={kidsCheckIns} children={children} visitRecords={visitRecords}/>}
+          {!isMemberPortal && isAdminUser && view==="adminnotes" && <AdminNotes notes={adminNotesAll} readIds={adminNotesRead} setReadIds={setAdminNotesRead} campuses={campuses} activeCampusId={activeCampusId}/>}
           {!isMemberPortal && view==="manual" && <ManualPage/>}
         </div>
       </div>
